@@ -72,114 +72,156 @@
       <button class="qb-primary" type="button" data-app-action="submit-check">Roll and submit vs DC {{dc}}</button>
     </form>
   {{else}}
-    <div class="qb-section qb-fate-section">
-      <h2>Fate check</h2>
-      <p class="qb-muted">A single d20 determines whether a threat finds the party. Apply pace, camp, and situational modifiers below.</p>
-      <form class="qb-fate-form">
-        <label class="qb-field">
-          <span>Situation</span>
-          <select name="situation">
-            <option value="travel">Traveling</option>
-            <option value="camp">Camping</option>
-          </select>
-        </label>
-        <label class="qb-field">
-          <span>Area difficulty</span>
-          <select name="area">
-            {{#each fateAreas}}
-              <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}} · DC {{dc}}</option>
-            {{/each}}
-          </select>
-        </label>
-        <label class="qb-field">
-          <span>Travel pace</span>
-          <select name="pace">
-            <option value="fast">Fast · {{signed config.paceModifiers.fast}}</option>
-            <option value="normal" selected>Regular · {{signed config.paceModifiers.normal}}</option>
-            <option value="slow">Slow · {{signed config.paceModifiers.slow}}</option>
-            <option value="stealth">Stealth group check</option>
-          </select>
-        </label>
-        <label class="qb-field">
-          <span>Situational modifier</span>
-          <input name="situational" type="number" value="0" min="-30" max="30" />
-        </label>
-        <button class="qb-primary" type="button" data-app-action="start-fate">Start Fate check</button>
-      </form>
-    </div>
-
-    {{#if state}}
-      <div class="qb-section">
-        <h2>Current run</h2>
-        <p class="qb-muted">{{state.statusLabel}}</p>
-        {{#if state.fateResult}}
-          <div class="qb-result qb-fate-result">
-            <strong>{{state.fateResult.label}}</strong>
-            <span>{{state.fateResult.total}} vs DC {{state.fate.dc}}</span>
-            <span>Base roll {{state.fateResult.baseRoll}} · pace {{signed state.fateResult.paceModifier}} · situation {{signed state.fateResult.situational}} · camp {{signed state.fateResult.campModifier}}</span>
-            {{#if state.fateResult.failed}}
-              <span>{{state.fateResult.difficulty.label}} · DC {{state.fateResult.difficulty.dc}}</span>
-              {{#if state.fateResult.showWatchShift}}
-                {{#if state.fateResult.watchShift}}<span>Watch shift {{state.fateResult.watchShift}}</span>{{/if}}
-              {{/if}}
+    <div class="qb-main-layout">
+      <div class="qb-primary-column">
+        {{#if showCurrentRun}}
+          <section class="qb-section qb-current-run {{#if state.fateResult.failed}}qb-threat-run{{/if}}">
+            <header class="qb-section-heading">
+              <div>
+                <span class="qb-eyebrow">Quick Battle</span>
+                <h2>Current run</h2>
+              </div>
+              {{#if state.fateResult.failed}}<span class="qb-stage-badge qb-stage-threat">Threat detected</span>{{else}}<span class="qb-stage-badge">In progress</span>{{/if}}
+            </header>
+            <p class="qb-muted">{{state.statusLabel}}</p>
+            {{#if state.fateResult}}
+              <div class="qb-result qb-fate-result">
+                <strong>{{state.fateResult.label}}</strong>
+                <span>{{state.fateResult.total}} vs DC {{state.fate.dc}}</span>
+                <span>Base roll {{state.fateResult.baseRoll}} · pace {{signed state.fateResult.paceModifier}} · situation {{signed state.fateResult.situational}} · camp {{signed state.fateResult.campModifier}}</span>
+                {{#if state.fateResult.failed}}
+                  <span>{{state.fateResult.difficulty.label}} · DC {{state.fateResult.difficulty.dc}}</span>
+                  {{#if state.fateResult.showWatchShift}}
+                    {{#if state.fateResult.watchShift}}<span>Watch shift {{state.fateResult.watchShift}}</span>{{/if}}
+                  {{/if}}
+                {{/if}}
+              </div>
             {{/if}}
-          </div>
-        {{/if}}
-        <div class="qb-rolls">
-          {{#each state.rolls}}
-            <div>{{label}}: {{#if pending}}Pending{{else}}{{total}}{{/if}}</div>
-          {{/each}}
-        </div>
-        {{#if canCancelRun}}
-          <button class="qb-secondary qb-cancel-run" type="button" data-app-action="cancel-run">Cancel current run</button>
-        {{/if}}
-      </div>
-    {{/if}}
-
-    {{#if groups.length}}
-      <div class="qb-section">
-        <h2>Encounter</h2>
-        <label class="qb-field">
-          <span>Encounter group / area</span>
-          <select name="encounter-group">
-            {{#each groups}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
-          </select>
-        </label>
-        <button class="qb-secondary" type="button" data-app-action="choose-encounter" {{#unless canChooseEncounter}}disabled{{/unless}}>Choose random encounter</button>
-        {{#if state.selectedEncounter}}
-          <div class="qb-result">
-            <strong>{{state.selectedEncounter.name}}</strong>
-            <span>{{state.selectedEncounter.description}}</span>
-            <span>{{state.selectedEncounter.difficultyLabel}} · DC {{state.selectedEncounter.dc}}</span>
-            <details class="qb-gm-only">
-              <summary>GM roster guidance</summary>
-              {{#each state.selectedEncounter.roster}}
-                <div>{{name}} × {{count}}</div>
-              {{else}}
-                <div>No roster configured.</div>
-              {{/each}}
-            </details>
-          </div>
-
-          <h3>Participants</h3>
-          <div class="qb-participants">
-            {{#each actors}}
-              <label class="qb-participant-row">
-                <span><input type="checkbox" class="qb-participant" value="{{uuid}}" {{#if defaultSelected}}checked{{/if}} /> {{name}}</span>
-                <input class="qb-situational" data-actor-uuid="{{uuid}}" type="number" value="0" aria-label="Situational modifier for {{name}}" />
-                {{#if checkStatus}}<small>{{checkStatus}}</small>{{/if}}
+            {{#if state.rolls.length}}
+              <div class="qb-roll-list">
+                <h3>Checks</h3>
+                <div class="qb-rolls">
+                  {{#each state.rolls}}
+                    <div><span>{{label}}</span><strong>{{#if pending}}Pending{{else}}{{total}}{{/if}}</strong></div>
+                  {{/each}}
+                </div>
+              </div>
+            {{/if}}
+            {{#if canCancelRun}}
+              <button class="qb-secondary qb-cancel-run" type="button" data-app-action="cancel-run">Cancel current run</button>
+            {{/if}}
+          </section>
+        {{else}}
+          <section class="qb-section qb-fate-section">
+            <header class="qb-section-heading">
+              <div>
+                <span class="qb-eyebrow">Begin a journey</span>
+                <h2>Fate check</h2>
+              </div>
+              <span class="qb-stage-badge">New run</span>
+            </header>
+            <p class="qb-muted">A single d20 determines whether a threat finds the party. Apply pace, camp, and situational modifiers below.</p>
+            <form class="qb-fate-form">
+              <label class="qb-field">
+                <span>Situation</span>
+                <select name="situation">
+                  <option value="travel">Traveling</option>
+                  <option value="camp">Camping</option>
+                </select>
               </label>
-            {{/each}}
-          </div>
-          <button class="qb-primary" type="button" data-app-action="start-checks" {{#unless canStartChecks}}disabled{{/unless}}>Prompt participant checks</button>
+              <label class="qb-field">
+                <span>Area difficulty</span>
+                <select name="area">
+                  {{#each fateAreas}}
+                    <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}} · DC {{dc}}</option>
+                  {{/each}}
+                </select>
+              </label>
+              <label class="qb-field">
+                <span>Travel pace</span>
+                <select name="pace">
+                  <option value="fast">Fast · {{signed config.paceModifiers.fast}}</option>
+                  <option value="normal" selected>Regular · {{signed config.paceModifiers.normal}}</option>
+                  <option value="slow">Slow · {{signed config.paceModifiers.slow}}</option>
+                  <option value="stealth">Stealth group check</option>
+                </select>
+              </label>
+              <label class="qb-field">
+                <span>Situational modifier</span>
+                <input name="situational" type="number" value="0" min="-30" max="30" />
+              </label>
+              <button class="qb-primary" type="button" data-app-action="start-fate">Start Fate check</button>
+            </form>
+          </section>
         {{/if}}
       </div>
-    {{else}}
-      <div class="qb-section">
-        <h2>Encounter data required</h2>
-        <p class="qb-muted">Add encounter groups and entries in Game Settings → Module Settings → Quick Battles configuration.</p>
-      </div>
-    {{/if}}
+
+      <aside class="qb-secondary-column">
+        {{#if groups.length}}
+          <section class="qb-section qb-encounter-section">
+            <header class="qb-section-heading">
+              <div>
+                <span class="qb-eyebrow">Choose your opposition</span>
+                <h2>Encounter</h2>
+              </div>
+              <span class="qb-stage-badge">01</span>
+            </header>
+            <label class="qb-field">
+              <span>Encounter group / area</span>
+              <select name="encounter-group">
+                {{#each groups}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+              </select>
+            </label>
+            <button class="qb-secondary" type="button" data-app-action="choose-encounter" {{#unless canChooseEncounter}}disabled{{/unless}}>Choose random encounter</button>
+            {{#if state.selectedEncounter}}
+              <div class="qb-encounter-card">
+                <span class="qb-eyebrow">{{state.selectedEncounter.difficultyLabel}} · DC {{state.selectedEncounter.dc}}</span>
+                <strong>{{state.selectedEncounter.name}}</strong>
+                <p>{{state.selectedEncounter.description}}</p>
+                <details class="qb-gm-only">
+                  <summary>GM roster guidance</summary>
+                  {{#each state.selectedEncounter.roster}}
+                    <div>{{name}} × {{count}}</div>
+                  {{else}}
+                    <div>No roster configured.</div>
+                  {{/each}}
+                </details>
+              </div>
+
+              <section class="qb-participant-section">
+                <header class="qb-section-heading">
+                  <div>
+                    <span class="qb-eyebrow">Party roster</span>
+                    <h3>Participants</h3>
+                  </div>
+                  <span class="qb-stage-badge">{{actors.length}} configured</span>
+                </header>
+                <div class="qb-participants">
+                  {{#each actors}}
+                    <label class="qb-participant-row">
+                      <span class="qb-participant-name"><input type="checkbox" class="qb-participant" value="{{uuid}}" {{#if defaultSelected}}checked{{/if}} /> {{name}}</span>
+                      <input class="qb-situational" data-actor-uuid="{{uuid}}" type="number" value="0" aria-label="Situational modifier for {{name}}" />
+                      {{#if checkStatus}}<small>{{checkStatus}}</small>{{/if}}
+                    </label>
+                  {{/each}}
+                </div>
+                <button class="qb-primary" type="button" data-app-action="start-checks" {{#unless canStartChecks}}disabled{{/unless}}>Prompt participant checks</button>
+              </section>
+            {{/if}}
+          </section>
+        {{else}}
+          <section class="qb-section qb-encounter-section">
+            <header class="qb-section-heading">
+              <div>
+                <span class="qb-eyebrow">Encounter setup</span>
+                <h2>Encounter data required</h2>
+              </div>
+            </header>
+            <p class="qb-muted">Add encounter groups and entries in Game Settings → Module Settings → Quick Battles configuration.</p>
+          </section>
+        {{/if}}
+      </aside>
+    </div>
 
   {{/if}}
 </section>

@@ -154,6 +154,15 @@ export function submittedRollTotal(rollData, deserializeRoll) {
   return total;
 }
 
+export function isRunActive(run) {
+  if (!run) return false;
+  return run.status === "fate-pending"
+    || run.status === "fate-resolving"
+    || run.status === "checks-pending"
+    || run.status === "encounter-selected"
+    || (run.status === "fate-resolved" && run.fateResult?.failed === true);
+}
+
 export function spellSlotBonus(spends, bonusesByLevel = {}) {
   return Object.entries(spends).reduce((total, [level, count]) => {
     return total + Math.max(0, Math.floor(finiteNumber(count))) * finiteNumber(bonusesByLevel[level], 0);
