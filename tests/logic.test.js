@@ -9,6 +9,7 @@ import {
   d20ModifierParts,
   encounterBand,
   failureDamage,
+  isRunActive,
   itemUses,
   mergeCatalog,
   parseFeatCatalog,
@@ -99,15 +100,32 @@ test("runs can be cancelled and native roll submissions recover from processing 
   assert.match(applicationSource, /function enqueueSubmission\(operation\)/);
 });
 
+test("the GM window shows either a new Fate check or an active run", () => {
+  assert.equal(isRunActive(null), false);
+  assert.equal(isRunActive({ status: "fate-pending" }), true);
+  assert.equal(isRunActive({ status: "checks-pending" }), true);
+  assert.equal(isRunActive({ status: "encounter-selected" }), true);
+  assert.equal(isRunActive({ status: "fate-resolved", fateResult: { failed: true } }), true);
+  assert.equal(isRunActive({ status: "fate-resolved", fateResult: { failed: false } }), false);
+  assert.equal(isRunActive({ status: "checks-resolved" }), false);
+  assert.equal(isRunActive({ status: "cancelled" }), false);
+  assert.match(mainTemplate, /{{#if showCurrentRun}}[\s\S]*Current run[\s\S]*{{else}}[\s\S]*Fate check[\s\S]*{{\/if}}/);
+  assert.match(applicationSource, /showCurrentRun: isRunActive\(run\)/);
+});
+
 test("participant checks close recovery after submission and restrict damage to the active GM", () => {
   assert.match(applicationSource, /findParticipantSubmission\(checkId\)/);
   assert.match(applicationSource, /removeOpenCheckButton\(checkId\)/);
-  assert.match(applicationSource, /flags\.\$\{MODULE_ID\}\.status`]: "submitted"/);
   assert.match(applicationSource, /async function processParticipantSubmission\(message, data\) \{\s*const userId = chatMessageAuthorId\(message\);/);
   assert.match(applicationSource, /Only the active GM can apply damage/);
   assert.match(applicationSource, /appliedDamageIds/);
   assert.match(applicationSource, /check\.damageApplied = true/);
   assert.match(applicationSource, /Hooks\.on\("renderChatMessage", hideSubmittedCheckAction\)/);
+  assert.match(applicationSource, /if \(prompt\) await prompt\.delete\(\)/);
+  assert.match(applicationSource, /await control\.delete\(\)/);
+  assert.match(mainTemplate, /class="qb-main-layout"/);
+  assert.match(mainTemplate, /class="qb-participant-section"/);
+  assert.match(mainTemplate, /qb-stage-threat/);
 });
 
 test("Fate result shows Watch Shift only for camp", () => {

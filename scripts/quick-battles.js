@@ -6,6 +6,7 @@ import {
   d20ModifierParts,
   encounterBand,
   failureDamage,
+  isRunActive,
   itemUses,
   mergeCatalog,
   parseFeatCatalog,
@@ -778,7 +779,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
   static DEFAULT_OPTIONS = {
     id: `${MODULE_ID}-window`,
     classes: ["quick-battles-app"],
-    position: { width: 500, height: "auto" },
+    position: { width: 960, height: "auto" },
     window: { title: "Quick Battles", resizable: true }
   };
 
@@ -791,6 +792,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     super({
       ...options,
       id: options.id ?? (isParticipant ? `${MODULE_ID}-check-${options.checkId}` : `${MODULE_ID}-window`),
+      position: { width: isParticipant ? 500 : 960, height: "auto", ...options.position },
       window: { title: isParticipant ? "Quick Battle check" : "Quick Battles", resizable: true }
     });
     this.mode = options.mode ?? "gm";
@@ -852,6 +854,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       canChooseEncounter: run?.status === "fate-resolved" && run.fateResult?.failed === true,
       canStartChecks: run?.status === "encounter-selected",
       canCancelRun: run?.status !== "cancelled",
+      showCurrentRun: isRunActive(run),
       state: run ? { ...run, statusLabel: statusLabel(run) } : null
     };
   }
@@ -928,13 +931,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     const config = await readConfig();
     if (config.players.length === 0) throw new Error("Configure at least one player and main character first.");
     const active = await currentRun();
-    if (active && (
-      active.run.status === "fate-pending"
-      || active.run.status === "fate-resolving"
-      || active.run.status === "checks-pending"
-      || active.run.status === "encounter-selected"
-      || (active.run.status === "fate-resolved" && active.run.fateResult?.failed)
-    )) {
+    if (isRunActive(active?.run)) {
       throw new Error("Resolve the current Quick Battles run before starting another.");
     }
     for (const entry of config.players) {
@@ -1572,16 +1569,11 @@ async function processParticipantSubmission(message, data) {
   check.damage = damage.damage;
   check.damageApplied = false;
 
-  const prompt = game.messages.get(check.promptId);
-  if (prompt) {
-    await prompt.update({
-      content: chatCard(`<h3>Quick Battle check · ${escapeHtml(actor.name)}</h3><p>Check submitted. Resource selection is closed.</p>`),
-      [`flags.${MODULE_ID}.status`]: "submitted"
-    });
-  }
   const allResolved = Object.values(current.run.checks).every((entry) => ["passed", "failed"].includes(entry.status));
   if (allResolved) current.run.status = "checks-resolved";
   await persistRun(current.run, current.message);
+  const prompt = game.messages.get(check.promptId);
+  if (prompt) await prompt.delete();
   if (!passed && damage.damage > 0) await createDamageControl(current.run, actor, message, details);
   mainApplication?.render();
 }
@@ -1617,6 +1609,7 @@ async function applyDamage(operationId) {
   const payload = control?.flags?.[MODULE_ID];
   if (!payload) throw new Error("Damage control was not found.");
   if (payload.status === "applied") {
+    await control.delete();
     ui.notifications.info("This damage has already been applied.");
     return;
   }
@@ -1643,6 +1636,7 @@ async function applyDamage(operationId) {
         check.damageApplied = true;
         await persistRun(current.run, current.message);
       }
+      await control.delete();
       return;
     }
     const currentHp = Math.max(0, Number(actor.system?.attributes?.hp?.value) || 0);
@@ -1666,6 +1660,7 @@ async function applyDamage(operationId) {
       check.damageApplied = true;
       await persistRun(current.run, current.message);
     }
+    await control.delete();
     ui.notifications.info(`${actor.name} takes ${payload.damage} damage.`);
     mainApplication?.render();
   } finally {
