@@ -8,7 +8,8 @@ import {
   mergeCatalog,
   parseFeatCatalog,
   selectedCatalogBonuses,
-  spellSlotBonus
+  spellSlotBonus,
+  submittedRollTotal
 } from "./logic.js";
 
 const MODULE_ID = "skyys-quick-battles";
@@ -1369,9 +1370,7 @@ async function processChatSubmission(message) {
 }
 
 function submittedRoll(message) {
-  const roll = message.rolls?.[0];
-  if (!roll || !Number.isFinite(Number(roll.total))) throw new Error("The submitted message has no valid Foundry roll.");
-  return Number(roll.total);
+  return submittedRollTotal(message.rolls?.[0], (serialized) => Roll.fromJSON(serialized));
 }
 
 async function processFateSubmission(message, data) {

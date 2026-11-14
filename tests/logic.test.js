@@ -11,7 +11,8 @@ import {
   mergeCatalog,
   parseFeatCatalog,
   selectedCatalogBonuses,
-  spellSlotBonus
+  spellSlotBonus,
+  submittedRollTotal
 } from "../scripts/logic.js";
 
 const catalogText = await readFile(new URL("../data/feat-catalog.csv", import.meta.url), "utf8");
@@ -66,6 +67,14 @@ test("native D20 roll configurations initialize the D&D 5e roll options", () => 
   assert.deepEqual(d20ModifierParts(0), []);
   assert.deepEqual(d20ModifierParts(3), ["3"]);
   assert.deepEqual(d20ModifierParts(-2), ["-2"]);
+});
+
+test("submitted chat rolls deserialize Foundry v14 roll data before reading totals", () => {
+  const serializedRoll = JSON.stringify({ total: 8 });
+  assert.equal(submittedRollTotal(serializedRoll, JSON.parse), 8);
+  assert.equal(submittedRollTotal({ total: 14 }), 14);
+  assert.throws(() => submittedRollTotal(null, JSON.parse), /no valid Foundry roll/);
+  assert.match(applicationSource, /submittedRollTotal\(message\.rolls\?\.\[0\], \(serialized\) => Roll\.fromJSON\(serialized\)\)/);
 });
 
 test("configuration supports GM-owned NPC mappings, searchable actors, and closes after saving", () => {
