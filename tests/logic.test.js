@@ -31,12 +31,37 @@ test("Foundry V14 application implements the Handlebars rendering contract", () 
 
 test("configuration is available through a structured Foundry settings menu", () => {
   assert.match(applicationSource, /game\.settings\.registerMenu\(MODULE_ID, "configurationMenu"/);
+  assert.match(applicationSource, /game\.settings\.register\(MODULE_ID, "configuration", \{[\s\S]*?scope: "world"/);
   assert.match(configurationTemplate, /data-field="userId"/);
   assert.match(configurationTemplate, /data-field="actorUuid"/);
   assert.match(configurationTemplate, /data-config-collection="encounters"/);
   assert.match(configurationTemplate, /data-field="fateDcEasy"/);
   assert.match(configurationTemplate, /data-config-collection="catalogOverrides"/);
+  assert.match(applicationSource, /actor\.testUserPermission\(user, "OWNER"\)/);
+  assert.match(applicationSource, /if \(actor\.type !== "character"\)/);
+  assert.match(configurationTemplate, /data-field="id" type="hidden"/);
+  assert.doesNotMatch(configurationTemplate, /<span>Group ID<\/span>/);
   assert.doesNotMatch(mainTemplate, /class="qb-config"/);
+});
+
+test("Quick Battles remembers selections and keeps the main configuration control compact", () => {
+  assert.match(applicationSource, /scope: "client"[\s\S]*?type: Object/);
+  assert.match(applicationSource, /rememberSelection\(\{ area \}\)/);
+  assert.match(applicationSource, /rememberSelection\(\{ encounterGroupId: groupId \}\)/);
+  assert.match(mainTemplate, /class="qb-toolbar"/);
+  assert.doesNotMatch(mainTemplate, /<h2>Configuration<\/h2>/);
+  assert.match(mainTemplate, /name="area"[\s\S]*?{{#if selected}}selected{{\/if}}/);
+  assert.match(mainTemplate, /name="encounter-group"[\s\S]*?{{#if selected}}selected{{\/if}}/);
+});
+
+test("run recovery is persisted without creating a GM-only run chat card", () => {
+  assert.match(applicationSource, /game\.settings\.register\(MODULE_ID, "activeRun", \{[\s\S]*?scope: "world"/);
+  assert.match(applicationSource, /game\.settings\.set\(MODULE_ID, "activeRun", JSON\.stringify\(run\)\)/);
+  assert.doesNotMatch(applicationSource, /content: `<p>Quick Battles run \$\{escapeHtml\(run\.id\)\}<\/p>`/);
+});
+
+test("native D20 roll configurations initialize the D&D 5e roll options", () => {
+  assert.match(applicationSource, /rolls: \[\{ parts: \[modifierPart\],[\s\S]*?options: \{\}/);
 });
 
 test("the supplied feat catalog is parsed in full, including comma-containing descriptions", () => {

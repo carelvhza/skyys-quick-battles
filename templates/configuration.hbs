@@ -1,5 +1,5 @@
 <form class="qb-shell qb-configuration-form">
-  <p class="qb-muted">These settings are saved for your GM account in this world.</p>
+  <p class="qb-muted">These settings are shared with all GM accounts in this world.</p>
 
   <section class="qb-section">
     <h2>Player characters</h2>
@@ -32,7 +32,7 @@
     <div class="qb-config-rows" data-config-collection="encounterGroups">
       {{#each config.encounterGroups}}
         <fieldset data-config-row>
-          <label class="qb-field"><span>Group ID</span><input data-field="id" value="{{id}}" required /></label>
+          <input data-field="id" type="hidden" value="{{id}}" />
           <label class="qb-field"><span>Display name</span><input data-field="name" value="{{name}}" required /></label>
           <button type="button" class="qb-secondary" data-app-action="remove-row">Remove group</button>
         </fieldset>

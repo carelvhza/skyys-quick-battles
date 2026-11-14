@@ -5,6 +5,27 @@
   color: var(--color-text-primary);
 }
 
+.quick-battles-config .window-content {
+  max-height: calc(100vh - 5rem);
+  overflow-y: auto;
+}
+
+.qb-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.qb-fate-form,
+.qb-check-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.qb-config-button {
+  width: auto;
+  padding-inline: 0.65rem;
+}
+
 .qb-section,
 .qb-panel {
   display: grid;

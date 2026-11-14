@@ -13,6 +13,7 @@ import {
 const MODULE_ID = "skyys-quick-battles";
 const TEMPLATE = `modules/${MODULE_ID}/templates/quick-battles.hbs`;
 const CONFIG_TEMPLATE = `modules/${MODULE_ID}/templates/configuration.hbs`;
+const DEFAULT_LAST_SELECTION = { area: "medium", encounterGroupId: "" };
 const DEFAULT_CONFIG = {
   players: [],
   encounterGroups: [],
@@ -82,7 +83,7 @@ async function nativeD20(actor, modifier, flavor) {
     : `1d20 ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`;
   const rolls = await rollClass.build(
     {
-      rolls: [{ parts: [modifierPart], data: actor?.getRollData?.() ?? {} }],
+      rolls: [{ parts: [modifierPart], data: actor?.getRollData?.() ?? {}, options: {} }],
       subject: actor ?? undefined,
       hookNames: ["D20Test"]
     },
@@ -278,11 +279,25 @@ async function effectiveCatalog(config) {
 function registerModuleSettings() {
   game.settings.register(MODULE_ID, "configuration", {
     name: "Quick Battles configuration",
-    hint: "GM-only configuration used by the Quick Battles window.",
-    scope: "user",
+    hint: "Shared world configuration used by the Quick Battles window.",
+    scope: "world",
     config: false,
     type: String,
     default: JSON.stringify(DEFAULT_CONFIG)
+  });
+  game.settings.register(MODULE_ID, "lastSelection", {
+    name: "Quick Battles last selection",
+    scope: "client",
+    config: false,
+    type: Object,
+    default: DEFAULT_LAST_SELECTION
+  });
+  game.settings.register(MODULE_ID, "activeRun", {
+    name: "Quick Battles active run",
+    scope: "world",
+    config: false,
+    type: String,
+    default: ""
   });
   game.settings.registerMenu(MODULE_ID, "configurationMenu", {
     name: "Quick Battles configuration",
@@ -327,27 +342,35 @@ async function currentRunMessage() {
 }
 
 async function currentRun(runId) {
-  const message = await currentRunMessage();
-  if (!message) return null;
-  const payload = message.flags?.[MODULE_ID];
-  if (runId && payload?.runId !== runId) return null;
-  return { message, run: payload.state };
+  const serializedRun = game.settings.get(MODULE_ID, "activeRun");
+  let run = null;
+  if (serializedRun) {
+    try {
+      run = JSON.parse(serializedRun);
+    } catch (error) {
+      throw new Error(`The active Quick Battles run is not valid JSON: ${error.message}`);
+    }
+  }
+  const message = run ? null : await currentRunMessage();
+  run ??= message?.flags?.[MODULE_ID]?.state ?? null;
+  if (!run || (runId && run.id !== runId)) return null;
+  return { message, run };
 }
 
 async function persistRun(run, message = null) {
   const payload = { type: "run-state", runId: run.id, state: run };
+  await game.settings.set(MODULE_ID, "activeRun", JSON.stringify(run));
   if (message) {
     await message.update({ [`flags.${MODULE_ID}`]: payload });
     activeRunMessage = message;
     return message;
   }
-  const created = await ChatMessage.create({
-    content: `<p>Quick Battles run ${escapeHtml(run.id)}</p>`,
-    whisper: gmUserIds(),
-    flags: { [MODULE_ID]: payload }
-  });
-  activeRunMessage = created;
-  return created;
+  return null;
+}
+
+async function rememberSelection(selection) {
+  const current = game.settings.get(MODULE_ID, "lastSelection") ?? DEFAULT_LAST_SELECTION;
+  await game.settings.set(MODULE_ID, "lastSelection", { ...current, ...selection });
 }
 
 function statusLabel(run) {
@@ -362,6 +385,13 @@ function statusLabel(run) {
 function sortActors() {
   return Array.from(game.actors)
     .filter((actor) => ["character", "npc"].includes(actor.type))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function mainCharacterActors(user) {
+  return Array.from(game.actors)
+    .filter((actor) => actor.type === "character")
+    .filter((actor) => user.isGM || actor.testUserPermission(user, "OWNER"))
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
@@ -573,23 +603,29 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     if (!game.user.isGM) throw new Error("Only a GM can configure Quick Battles.");
     const config = this.configDraft ?? await readConfig();
     const users = Array.from(game.users)
-      .filter((user) => !user.isGM)
       .map((user) => ({ id: user.id, name: user.name }));
     const actors = sortActors().map((actor) => ({ uuid: actor.uuid, name: actor.name }));
     const withSelectedOption = (options, selected, valueKey) => {
       const prepared = options.map((option) => ({ ...option, selected: option[valueKey] === selected }));
       if (selected && !prepared.some((option) => option[valueKey] === selected)) {
-        prepared.unshift({ [valueKey]: selected, name: `Unavailable: ${selected}`, selected: true });
+        prepared.unshift({ [valueKey]: selected, name: "Unavailable selection", selected: true });
       }
       return prepared;
     };
     const preparedConfig = {
       ...config,
-      players: config.players.map((player) => ({
-        ...player,
-        users: withSelectedOption(users, player.userId, "id"),
-        actors: withSelectedOption(actors, player.actorUuid, "uuid")
-      })),
+      players: config.players.map((player) => {
+        const user = game.users.get(player.userId);
+        const ownedCharacters = user ? mainCharacterActors(user).map((actor) => ({
+          uuid: actor.uuid,
+          name: actor.name
+        })) : [];
+        return {
+          ...player,
+          users: withSelectedOption(users, player.userId, "id"),
+          actors: withSelectedOption(ownedCharacters, player.actorUuid, "uuid")
+        };
+      }),
       encounters: config.encounters.map((encounter) => ({
         ...encounter,
         groupOptions: config.encounterGroups.map((group) => ({
@@ -632,6 +668,31 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       event.preventDefault();
       this._handleConfigurationAction(button).catch(notifyError);
     });
+    this.element.addEventListener("change", (event) => {
+      const field = event.target;
+      if (field.matches('[data-field="userId"]')) {
+        this._updateMainCharacterOptions(field.closest("[data-config-row]"), field.value);
+      }
+    });
+  }
+
+  _updateMainCharacterOptions(row, userId) {
+    const select = row.querySelector('[data-field="actorUuid"]');
+    const currentUuid = select.value;
+    const user = game.users.get(userId);
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select a character";
+    select.replaceChildren(placeholder);
+    if (!user) return;
+    const characters = mainCharacterActors(user);
+    for (const actor of characters) {
+      const option = document.createElement("option");
+      option.value = actor.uuid;
+      option.textContent = actor.name;
+      select.append(option);
+    }
+    if (characters.some((actor) => actor.uuid === currentUuid)) select.value = currentUuid;
   }
 
   async _handleConfigurationAction(button) {
@@ -697,6 +758,13 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
   async _prepareContext() {
     if (this.mode === "participant") return this._prepareParticipantContext();
     const config = await readConfig();
+    const lastSelection = game.settings.get(MODULE_ID, "lastSelection") ?? DEFAULT_LAST_SELECTION;
+    const selectedArea = ["easy", "medium", "hard"].includes(lastSelection.area)
+      ? lastSelection.area
+      : DEFAULT_LAST_SELECTION.area;
+    const selectedGroupId = config.encounterGroups.some((group) => group.id === lastSelection.encounterGroupId)
+      ? lastSelection.encounterGroupId
+      : config.encounterGroups[0]?.id;
     const current = await currentRun();
     const run = current?.run ?? null;
     const configuredActorIds = new Set(config.players.map((entry) => entry.actorUuid));
@@ -725,7 +793,15 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     return {
       isParticipant: false,
       config,
-      groups: config.encounterGroups,
+      fateAreas: [
+        { value: "easy", label: "Easy", dc: config.fateDcs.easy, selected: selectedArea === "easy" },
+        { value: "medium", label: "Medium", dc: config.fateDcs.medium, selected: selectedArea === "medium" },
+        { value: "hard", label: "Hard", dc: config.fateDcs.hard, selected: selectedArea === "hard" }
+      ],
+      groups: config.encounterGroups.map((group) => ({
+        ...group,
+        selected: group.id === selectedGroupId
+      })),
       actors,
       rolls,
       canChooseEncounter: run?.status === "fate-resolved" && run.fateResult?.failed === true,
@@ -777,6 +853,13 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       event.preventDefault();
       this._handleAppAction(button.dataset.appAction).catch(notifyError);
     });
+    this.element.addEventListener("change", (event) => {
+      const field = event.target;
+      if (field.name === "area") rememberSelection({ area: field.value }).catch(notifyError);
+      else if (field.name === "encounter-group") {
+        rememberSelection({ encounterGroupId: field.value }).catch(notifyError);
+      }
+    });
   }
 
   async _handleAppAction(action) {
@@ -802,9 +885,12 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     }
     for (const entry of config.players) {
       const user = game.users.get(entry.userId);
-      if (!user || user.isGM) throw new Error(`Configured player ${entry.userId} must be a non-GM user.`);
+      if (!user) throw new Error(`Configured player ${entry.userId} was not found.`);
       const actor = await actorByUuid(entry.actorUuid);
-      if (!actor.testUserPermission(user, "OWNER")) {
+      if (actor.type !== "character") {
+        throw new Error(`${actor.name} must be a character to serve as a main character.`);
+      }
+      if (!user.isGM && !actor.testUserPermission(user, "OWNER")) {
         throw new Error(`${user.name} must own the configured main character ${actor.name}.`);
       }
     }
@@ -812,6 +898,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     const situation = form.querySelector('[name="situation"]').value;
     const pace = form.querySelector('[name="pace"]').value;
     const area = form.querySelector('[name="area"]').value;
+    await rememberSelection({ area });
     const situational = numberValue(form.querySelector('[name="situational"]').value, "Situational modifier");
     const dc = numberValue(config.fateDcs[area], "Area DC");
     const selected = await new Roll(`1d${config.players.length}`).evaluate();
@@ -865,6 +952,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       throw new Error("Resolve a failed Fate check before choosing an encounter.");
     }
     const groupId = this.element.querySelector('[name="encounter-group"]').value;
+    await rememberSelection({ encounterGroupId: groupId });
     const entries = config.encounters.filter((entry) => entry.groups.includes(groupId));
     if (entries.length === 0) throw new Error("The selected encounter group has no entries.");
     const choice = await new Roll(`1d${entries.length}`).evaluate();
