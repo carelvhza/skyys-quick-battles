@@ -1,6 +1,8 @@
 import {
+  applyResourceUpdates,
   averageRoundedDown,
   availableSpellSlots,
+  capDamageAtOneHp,
   calculatePassiveBonuses,
   chatMessageAuthorId,
   d20ModifierParts,
@@ -523,7 +525,7 @@ function updateActiveBonusPreview(element) {
     bonusPerUse: input.dataset.bonusPerUse
   }));
   const bonus = resourceBonus(entries);
-  preview.textContent = `Active bonus: ${bonus >= 0 ? "+" : ""}${bonus}`;
+  preview.querySelector("[data-bonus-total]").textContent = `${bonus >= 0 ? "+" : ""}${bonus}`;
 }
 
 function createButton(label, action, attributes = "") {
@@ -1052,7 +1054,10 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     current.run.status = "encounter-selected";
     await persistRun(current.run, current.message);
     await ChatMessage.create({
-      content: chatCard(`<h3>${escapeHtml(selected.name)}</h3><p>${escapeHtml(selected.description ?? "")}</p><p>${escapeHtml(fateDifficulty.label)} · DC ${escapeHtml(current.run.selectedEncounter.dc)}</p>`, "qb-encounter-card"),
+      content: chatCard(
+        `<header><div><span class="qb-eyebrow">Encounter selected</span><h3>${escapeHtml(selected.name)}</h3></div><span class="qb-encounter-difficulty">${escapeHtml(current.run.selectedEncounter.difficultyLabel)} · DC ${escapeHtml(current.run.selectedEncounter.dc)}</span></header><p>${escapeHtml(selected.description ?? "")}</p>`,
+        "qb-encounter-card"
+      ),
       flags: {
         [MODULE_ID]: {
           type: "encounter-card",
@@ -1156,17 +1161,18 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       const totalModifier = preview.passive.total + activePlan.bonus + slotPlan.bonus + situational;
       const roll = await nativeD20(actor, totalModifier, `Quick Battle check · ${actor.name}`);
       if (!roll) return;
-      if (activePlan.updates.length) await actor.updateEmbeddedDocuments("Item", activePlan.updates);
-      if (Object.keys(slotPlan.updates).length) await actor.update(slotPlan.updates);
+      await applyResourceUpdates(actor, activePlan.updates, slotPlan.updates);
       const total = Number(roll.total);
       const passed = total >= Number(payload.dc);
       const damage = passed
         ? { margin: 0, fraction: 0, damage: 0 }
-        : failureDamage(actor.system?.attributes?.hp?.max, total, payload.dc, config.damageCap);
-      const spent = [
-        ...activePlan.spent,
-        ...slotPlan.spent
-      ];
+        : failureDamage(
+          actor.system?.attributes?.hp?.max,
+          total,
+          payload.dc,
+          config.damageCap,
+          actor.system?.attributes?.hp?.value
+        );
       const details = {
         actorName: actor.name,
         actorUuid: actor.uuid,
@@ -1183,8 +1189,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
         activeBonus: activePlan.bonus,
         slotBonus: slotPlan.bonus,
         situational,
-        totalModifier,
-        spent
+        totalModifier
       };
       await ChatMessage.create({
         content: renderParticipantResult(details, false),
@@ -1210,7 +1215,6 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
 
   _activeSpendPlan(actor, options) {
     let bonus = 0;
-    const spent = [];
     const updates = [];
     for (const option of options) {
       const input = this.element.querySelector(`[name="active-${CSS.escape(option.itemId)}"]`);
@@ -1229,15 +1233,13 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       updates.push({ _id: item.id, [current.updatePath]: updateValue });
       const itemBonus = count * option.bonusPerUse;
       bonus += itemBonus;
-      spent.push({ label: `${count}× ${option.name}`, bonus: itemBonus });
     }
-    return { bonus, spent, updates };
+    return { bonus, updates };
   }
 
   _slotSpendPlan(actor, slots, bonusesByLevel) {
     const spends = {};
     const updates = {};
-    const spent = [];
     for (const slot of slots) {
       const input = this.element.querySelector(`[name="slot-${slot.level}"]`);
       const rawCount = numberValue(input?.value ?? 0, `Level ${slot.level} spell slots`);
@@ -1250,10 +1252,8 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       if (count > current) throw new Error(`Not enough level ${slot.level} spell slots remain.`);
       spends[slot.level] = count;
       updates[`system.spells.${key}.value`] = current - count;
-      const bonus = count * (Number(bonusesByLevel[slot.level]) || 0);
-      spent.push({ label: `${count}× level ${slot.level} spell slot`, bonus });
     }
-    return { spends, updates, spent, bonus: spellSlotBonus(spends, bonusesByLevel) };
+    return { spends, updates, bonus: spellSlotBonus(spends, bonusesByLevel) };
   }
 }
 
@@ -1269,9 +1269,6 @@ function renderParticipantResult(details, damageApplied) {
     `AC ${signed(details.passive.armor)}`,
     ...details.passiveEntries.map((entry) => `${escapeHtml(entry.name)} ${signed(entry.bonus)}`)
   ].join(", ");
-  const spent = details.spent.length
-    ? `<div>Resources spent: ${details.spent.map((entry) => `${escapeHtml(entry.label)} (${signed(entry.bonus)})`).join(", ")}</div>`
-    : "<div>Resources spent: none</div>";
   const damage = details.passed
     ? "<div>Encounter check passed.</div>"
     : damageApplied
@@ -1283,7 +1280,7 @@ function renderParticipantResult(details, damageApplied) {
     `<header><img src="${escapeHtml(details.actorImg)}" alt="" /><h3>${escapeHtml(details.actorName)} vs DC ${details.dc}</h3></header>
      <div>Passive: ${signed(details.passive.total)} (${passiveBreakdown})</div>
      <div>Active: ${signed(details.activeBonus)} · Spell slots: ${signed(details.slotBonus)} · Situation: ${signed(details.situational)}</div>
-     <div class="qb-check-roll">Roll <strong>${details.total}</strong> vs DC ${details.dc} · ${result}</div>${spent}${damage}`,
+     <div class="qb-check-roll">Roll <strong>${details.total}</strong> vs DC ${details.dc} · ${result}</div>${damage}`,
     details.passed ? "qb-check-success" : "qb-check-failure"
   );
 }
@@ -1550,7 +1547,13 @@ async function processParticipantSubmission(message, data) {
   const config = await readConfig();
   const damage = passed
     ? { margin: 0, fraction: 0, damage: 0 }
-    : failureDamage(actor.system?.attributes?.hp?.max, total, current.run.selectedEncounter.dc, config.damageCap);
+    : failureDamage(
+      actor.system?.attributes?.hp?.max,
+      total,
+      current.run.selectedEncounter.dc,
+      config.damageCap,
+      actor.system?.attributes?.hp?.value
+    );
   details.total = total;
   details.passed = passed;
   details.margin = damage.margin;
@@ -1640,7 +1643,8 @@ async function applyDamage(operationId) {
       return;
     }
     const currentHp = Math.max(0, Number(actor.system?.attributes?.hp?.value) || 0);
-    const newHp = Math.max(0, currentHp - Number(payload.damage));
+    const damage = capDamageAtOneHp(payload.damage, currentHp);
+    const newHp = currentHp - damage;
     await actor.update({
       "system.attributes.hp.value": newHp,
       [`flags.${MODULE_ID}.appliedDamageIds`]: [...appliedIds, operationId]
@@ -1649,9 +1653,15 @@ async function applyDamage(operationId) {
     const result = game.messages.get(payload.resultMessageId);
     if (result) {
       const details = result.flags?.[MODULE_ID]?.details;
+      if (details) {
+        details.damage = damage;
+        const maxHp = Math.max(0, Number(actor.system?.attributes?.hp?.max) || 0);
+        details.damagePercent = maxHp > 0 ? Math.round((damage / maxHp) * 100) : 0;
+      }
       await result.update({
         content: renderParticipantResult(details, true),
-        [`flags.${MODULE_ID}.damageApplied`]: true
+        [`flags.${MODULE_ID}.damageApplied`]: true,
+        ...(details ? { [`flags.${MODULE_ID}.details`]: details } : {})
       });
     }
     const current = await currentRun(payload.runId);
@@ -1661,7 +1671,7 @@ async function applyDamage(operationId) {
       await persistRun(current.run, current.message);
     }
     await control.delete();
-    ui.notifications.info(`${actor.name} takes ${payload.damage} damage.`);
+    ui.notifications.info(`${actor.name} takes ${damage} damage.`);
     mainApplication?.render();
   } finally {
     damageInFlight.delete(operationId);

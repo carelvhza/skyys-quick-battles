@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  applyResourceUpdates,
   averageRoundedDown,
   availableSpellSlots,
   calculatePassiveBonuses,
+  capDamageAtOneHp,
   chatMessageAuthorId,
   d20ModifierParts,
   encounterBand,
@@ -20,10 +22,11 @@ import {
 } from "../scripts/logic.js";
 
 const catalogText = await readFile(new URL("../data/feat-catalog.csv", import.meta.url), "utf8");
-const [applicationSource, configurationTemplate, mainTemplate] = await Promise.all([
+const [applicationSource, configurationTemplate, mainTemplate, styleSource] = await Promise.all([
   readFile(new URL("../scripts/quick-battles.js", import.meta.url), "utf8"),
   readFile(new URL("../templates/configuration.hbs", import.meta.url), "utf8"),
-  readFile(new URL("../templates/quick-battles.hbs", import.meta.url), "utf8")
+  readFile(new URL("../templates/quick-battles.hbs", import.meta.url), "utf8"),
+  readFile(new URL("../styles/quick-battles.css", import.meta.url), "utf8")
 ]);
 
 test("Foundry V14 application implements the Handlebars rendering contract", () => {
@@ -43,6 +46,9 @@ test("configuration is available through a structured Foundry settings menu", ()
   assert.match(configurationTemplate, /data-config-collection="encounters"/);
   assert.match(configurationTemplate, /data-field="fateDcEasy"/);
   assert.match(configurationTemplate, /data-config-collection="catalogOverrides"/);
+  assert.match(styleSource, /\.qb-configuration-form\s*\{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(styleSource, /@container quick-battles \(max-width: 40rem\)[\s\S]*\.qb-configuration-form/);
+  assert.match(configurationTemplate, /qb-config-intro/);
   assert.match(applicationSource, /actor\.testUserPermission\(user, "OWNER"\)/);
   assert.match(applicationSource, /if \(!user\.isGM && actor\.type !== "character"\)/);
   assert.match(configurationTemplate, /data-field="id" type="hidden"/);
@@ -120,12 +126,17 @@ test("participant checks close recovery after submission and restrict damage to 
   assert.match(applicationSource, /Only the active GM can apply damage/);
   assert.match(applicationSource, /appliedDamageIds/);
   assert.match(applicationSource, /check\.damageApplied = true/);
+  assert.match(applicationSource, /capDamageAtOneHp\(payload\.damage, currentHp\)/);
   assert.match(applicationSource, /Hooks\.on\("renderChatMessage", hideSubmittedCheckAction\)/);
   assert.match(applicationSource, /if \(prompt\) await prompt\.delete\(\)/);
   assert.match(applicationSource, /await control\.delete\(\)/);
-  assert.match(mainTemplate, /class="qb-main-layout"/);
+  assert.match(mainTemplate, /class="qb-main-layout(?:\s|")/);
+  assert.match(mainTemplate, /{{#if showCurrentRun}}[\s\S]*class="qb-secondary-column"[\s\S]*{{\/if}}/);
+  assert.match(mainTemplate, /qb-main-layout-no-opposition/);
   assert.match(mainTemplate, /class="qb-participant-section"/);
   assert.match(mainTemplate, /qb-stage-threat/);
+  assert.match(applicationSource, /qb-encounter-difficulty/);
+  assert.doesNotMatch(applicationSource, /Resources spent:/);
 });
 
 test("Fate result shows Watch Shift only for camp", () => {
@@ -135,10 +146,11 @@ test("Fate result shows Watch Shift only for camp", () => {
 });
 
 test("participant bonus preview updates from resource-count input changes", () => {
-  assert.match(mainTemplate, /data-active-bonus-preview role="status" aria-live="polite"/);
+  assert.match(mainTemplate, /data-active-bonus-preview role="status" aria-live="polite"[\s\S]*data-bonus-total/);
   assert.match(mainTemplate, /data-bonus-count data-bonus-per-use=/);
   assert.match(applicationSource, /addEventListener\("input", \(event\) => \{[\s\S]*?updateActiveBonusPreview/);
-  assert.match(applicationSource, /preview\.textContent = `Active bonus:/);
+  assert.match(applicationSource, /preview\.querySelector\("\[data-bonus-total\]"\)\.textContent/);
+  assert.match(styleSource, /\.qb-active-bonus-preview\s*\{\s*margin: 0;[\s\S]*justify-content: space-between/);
 });
 
 test("the supplied feat catalog is parsed in full, including comma-containing descriptions", () => {
@@ -178,11 +190,17 @@ test("passive bonus calculation uses first ability on ties and includes all conf
     ability: 3,
     abilityName: "STR",
     charisma: 2,
-    hp: 2,
+    hp: 1,
     armor: 2,
     catalog: 4,
-    total: 13
+    total: 12
   });
+});
+
+test("current HP bonus increases by one per 50 hit points", () => {
+  for (const [currentHp, expectedBonus] of [[49, 0], [50, 1], [99, 1], [100, 2]]) {
+    assert.equal(calculatePassiveBonuses({ currentHp }).hp, expectedBonus);
+  }
 });
 
 test("group Stealth average rounds down", () => {
@@ -237,6 +255,22 @@ test("difficulty bands and capped failure damage use the specified thresholds", 
   assert.deepEqual(failureDamage(80, 1, 100, 0.35), { margin: 99, fraction: 0.35, damage: 28 });
 });
 
+test("failure damage is capped to leave at least one current hit point", () => {
+  assert.deepEqual(failureDamage(100, 0, 100, 1, 10), { margin: 100, fraction: 0.09, damage: 9 });
+  assert.deepEqual(failureDamage(100, 0, 100, 0.25, 10), { margin: 100, fraction: 0.09, damage: 9 });
+  assert.deepEqual(failureDamage(100, 0, 100, 1, 1), { margin: 100, fraction: 0, damage: 0 });
+  assert.deepEqual(failureDamage(100, 0, 100, 1, 0), { margin: 100, fraction: 0, damage: 0 });
+  assert.deepEqual(failureDamage(100, 0, 100, 1, 50), { margin: 100, fraction: 0.49, damage: 49 });
+});
+
+test("damage application cap never raises HP and accounts for intervening damage", () => {
+  assert.equal(capDamageAtOneHp(20, 10), 9);
+  assert.equal(capDamageAtOneHp(20, 1), 0);
+  assert.equal(capDamageAtOneHp(20, 0), 0);
+  assert.equal(capDamageAtOneHp(0, 10), 0);
+  assert.equal(capDamageAtOneHp(4, 10), 4);
+});
+
 test("native use data supports current-value and legacy spent counters", () => {
   assert.deepEqual(itemUses({ system: { uses: { max: 3, value: 1 } } }), {
     available: 1,
@@ -253,6 +287,67 @@ test("native use data supports current-value and legacy spent counters", () => {
     updatePath: "system.uses.value",
     current: 2
   });
+});
+
+test("resource updates persist D&D 5e item uses and spell-slot values", async () => {
+  const item = {
+    id: "feature",
+    name: "Lucky",
+    system: { uses: { value: 2, max: 3 } },
+    async update(changes) {
+      for (const [path, value] of Object.entries(changes)) {
+        const parts = path.split(".");
+        const key = parts.pop();
+        const parent = parts.reduce((object, part) => object[part], this);
+        parent[key] = value;
+      }
+    }
+  };
+  const actor = {
+    items: new Map([[item.id, item]]),
+    system: { spells: { spell1: { value: 2, max: 3 } } },
+    async update(updates) {
+      for (const [path, value] of Object.entries(updates)) {
+        const parts = path.split(".");
+        const key = parts.pop();
+        const parent = parts.reduce((object, part) => object[part], this);
+        parent[key] = value;
+      }
+    }
+  };
+
+  await applyResourceUpdates(actor, [
+    { _id: "feature", "system.uses.value": 1 }
+  ], {
+    "system.spells.spell1.value": 1
+  });
+  assert.equal(item.system.uses.value, 1);
+  assert.equal(actor.system.spells.spell1.value, 1);
+});
+
+test("resource update failures and unpersisted paths are surfaced", async () => {
+  const permissionDeniedItem = {
+    name: "Lucky",
+    async update() {
+      throw new Error("permission denied");
+    }
+  };
+  await assert.rejects(
+    applyResourceUpdates({
+      items: new Map([["feature", permissionDeniedItem]])
+    }, [{ _id: "feature", "system.uses.value": 0 }]),
+    /permission denied/
+  );
+  await assert.rejects(
+    applyResourceUpdates({
+      items: new Map([["feature", {
+        name: "Lucky",
+        system: { uses: { value: 2 } },
+        async update() {}
+      }]])
+    }, [{ _id: "feature", "system.uses.value": 1 }]),
+    /was not saved/
+  );
 });
 
 test("catalog overrides can disable defaults and add custom features", () => {

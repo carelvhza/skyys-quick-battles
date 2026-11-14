@@ -125,7 +125,7 @@ export function calculatePassiveBonuses({ abilities = {}, currentHp = 0, ac = 0,
     ability: bestAbility.modifier,
     abilityName: bestAbility.key.toUpperCase(),
     charisma: Math.ceil(charismaModifier / 2),
-    hp: Math.floor(finiteNumber(currentHp, 0) / 40),
+    hp: Math.floor(finiteNumber(currentHp, 0) / 50),
     armor: armorClass >= 22 ? 2 : armorClass >= 19 ? 1 : 0,
     catalog: finiteNumber(catalogBonus, 0)
   };
@@ -203,15 +203,23 @@ export function encounterBand(roll, bands) {
   return band;
 }
 
-export function failureDamage(maxHp, total, dc, cap = 1) {
+export function capDamageAtOneHp(damage, currentHp) {
+  const requestedDamage = Math.max(0, Math.floor(finiteNumber(damage, 0)));
+  const availableDamage = Math.max(0, Math.floor(finiteNumber(currentHp, 0)) - 1);
+  return Math.min(requestedDamage, availableDamage);
+}
+
+export function failureDamage(maxHp, total, dc, cap = 1, currentHp = maxHp) {
   const margin = Math.max(0, Math.floor(finiteNumber(dc) - finiteNumber(total)));
   const maxHitPoints = Math.max(0, finiteNumber(maxHp));
   const maxFraction = Math.min(1, Math.max(0, finiteNumber(cap, 1)));
   const fraction = Math.min(maxFraction, margin * 0.05);
+  const calculatedDamage = Math.floor(maxHitPoints * fraction);
+  const damage = capDamageAtOneHp(calculatedDamage, currentHp);
   return {
     margin,
-    fraction,
-    damage: Math.floor(maxHitPoints * fraction)
+    fraction: damage < calculatedDamage && maxHitPoints > 0 ? damage / maxHitPoints : fraction,
+    damage
   };
 }
 
@@ -236,6 +244,41 @@ export function itemUses(item) {
     updatePath: "system.uses.spent",
     current: spent
   };
+}
+
+function getPathValue(object, path) {
+  return path.split(".").reduce((value, key) => value?.[key], object);
+}
+
+export async function applyResourceUpdates(actor, itemUpdates = [], actorUpdates = {}) {
+  for (const update of itemUpdates) {
+    const { _id, ...changes } = update;
+    const item = actor.items?.get(_id);
+    if (typeof item?.update !== "function") {
+      throw new Error(`This actor cannot update resource item ${_id}.`);
+    }
+    await item.update(changes);
+  }
+  if (Object.keys(actorUpdates).length) {
+    if (typeof actor?.update !== "function") {
+      throw new Error("This actor cannot update spell-slot resources.");
+    }
+    await actor.update(actorUpdates);
+  }
+
+  for (const update of itemUpdates) {
+    const item = actor.items?.get(update._id);
+    if (!item) throw new Error(`Could not verify resource updates for item ${update._id}.`);
+    const changes = Object.entries(update).filter(([path]) => path !== "_id");
+    if (changes.some(([path, expected]) => Number(getPathValue(item, path)) !== Number(expected))) {
+      throw new Error(`The resource update for ${item.name} was not saved.`);
+    }
+  }
+  for (const [path, expected] of Object.entries(actorUpdates)) {
+    if (Number(getPathValue(actor, path)) !== Number(expected)) {
+      throw new Error(`The actor resource update at ${path} was not saved.`);
+    }
+  }
 }
 
 export function selectedCatalogBonuses(catalog, actorItems) {

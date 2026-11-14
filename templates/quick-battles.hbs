@@ -68,11 +68,14 @@
         </details>
       </div>
 
-      <p class="qb-active-bonus-preview" data-active-bonus-preview role="status" aria-live="polite" aria-atomic="true">Active bonus: +0</p>
+      <div class="qb-active-bonus-preview" data-active-bonus-preview role="status" aria-live="polite" aria-atomic="true">
+        <span>Selected resource bonus</span>
+        <strong data-bonus-total>+0</strong>
+      </div>
       <button class="qb-primary" type="button" data-app-action="submit-check">Roll and submit vs DC {{dc}}</button>
     </form>
   {{else}}
-    <div class="qb-main-layout">
+    <div class="qb-main-layout {{#unless showCurrentRun}}qb-main-layout-no-opposition{{/unless}}">
       <div class="qb-primary-column">
         {{#if showCurrentRun}}
           <section class="qb-section qb-current-run {{#if state.fateResult.failed}}qb-threat-run{{/if}}">
@@ -156,6 +159,7 @@
         {{/if}}
       </div>
 
+      {{#if showCurrentRun}}
       <aside class="qb-secondary-column">
         {{#if groups.length}}
           <section class="qb-section qb-encounter-section">
@@ -221,6 +225,7 @@
           </section>
         {{/if}}
       </aside>
+      {{/if}}
     </div>
 
   {{/if}}
