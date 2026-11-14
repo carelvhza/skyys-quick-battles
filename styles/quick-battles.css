@@ -35,10 +35,48 @@
   min-width: 0;
 }
 
-.qb-config {
+.qb-config-rows {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.qb-config-rows fieldset,
+.qb-config-rows [data-roster-row] {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border-light-2);
+  border-radius: 0.3rem;
+}
+
+.qb-config-subsection,
+.qb-config-checks {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.qb-config-subsection h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.qb-config-checks label {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.qb-configuration-form textarea,
+.qb-configuration-form input,
+.qb-configuration-form select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.qb-configuration-form textarea {
   width: 100%;
-  min-height: 15rem;
-  font: 0.8rem/1.35 monospace;
+  resize: vertical;
 }
 
 .qb-primary,

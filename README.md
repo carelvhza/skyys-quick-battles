@@ -4,48 +4,13 @@ A lightweight Foundry VTT module for travel Fate checks, grouped encounter selec
 
 ## Open the GM window
 
-Enable the module, then open the Quick Battles window as a GM with `/quickbattles` in chat or `Shift+Alt+B`. The window stays open as Fate, encounter, and participant stages progress.
+Enable the module, then open the Quick Battles window as a GM with `/quickbattles` in chat or `Shift+Alt+B`. Type the slash command exactly as shown; `quickbattle,s` is not a registered command. The window stays open as Fate, encounter, and participant stages progress.
 
 ## Configure players and encounters
 
-Open **Edit configuration** in the GM window. Configuration is JSON stored in the current GM user's Foundry setting; each GM profile must configure its own values. Player cards receive only the check data they need. A minimal configuration looks like:
+In Foundry, open **Game Settings → Configure Settings → Module Settings → Quick Battles configuration → Configure**. The GM-only configuration form lets you manage player-to-character mappings, encounter groups and entries, GM roster guidance, Fate DCs, travel and spell-slot modifiers, encounter difficulty bands, damage behavior, and feature catalog changes. You can also open the same form from the Quick Battles window. Settings are stored per GM user; each GM profile must configure its own values. Player cards receive only the check data they need.
 
-```json
-{
-  "players": [
-    { "userId": "USER_ID", "actorUuid": "Actor.ACTOR_ID" }
-  ],
-  "encounterGroups": [
-    { "id": "forest", "name": "Forest" }
-  ],
-  "encounters": [
-    {
-      "id": "forest-ambush",
-      "name": "Forest ambush",
-      "description": "A brief player-facing description.",
-      "groups": ["forest"],
-      "roster": [
-        { "actorId": "NPC_ACTOR_ID", "count": 2 }
-      ]
-    }
-  ]
-}
-```
-
-Use Foundry user IDs and actor UUIDs for the configured player-to-main-character mapping. An encounter can list more than one group. Its `roster` is GM-only and is used as tactical build guidance; counts do not modify encounter difficulty. The participant checklist defaults to configured main characters, and the GM can add other character/NPC actors for that run.
-
-The same configuration object accepts `fateDcs`, `campBonus`, `paceModifiers`, `spellSlotBonuses`, `encounterDifficultyBands`, `damageCap`, and `postGmResults` to adjust the defaults below. Difficulty bands must cover d20 results 1–20 contiguously; each band has `min`, `max`, `label`, and `dc`.
-
-The complete default feature allowlist is included in `data/feat-catalog.csv` from the supplied 384-row catalog. Only matching catalog entries contribute passive bonuses or appear as active resources; Low/Medium/High map to +1/+2/+3. Add `catalogOverrides` to the JSON to replace an entry by name, add a custom entry, or disable a default:
-
-```json
-{
-  "catalogOverrides": [
-    { "name": "Custom Feature", "type": "Active", "rating": "Medium", "bonusPerUse": 2 },
-    { "name": "Alert", "disabled": true }
-  ]
-}
-```
+Use Foundry's user and actor selectors to map each player to a main character. Encounters can belong to multiple groups and can include optional DC/label overrides plus GM-only roster guidance; roster counts do not modify encounter difficulty. Difficulty bands must cover d20 results 1–20 contiguously. The feature catalog form can change a feature's type or bonus, disable a default entry by name, or add a custom feature; Low/Medium/High ratings map to +1/+2/+3.
 
 ## Defaults
 

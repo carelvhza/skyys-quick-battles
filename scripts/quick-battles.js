@@ -12,6 +12,7 @@ import {
 
 const MODULE_ID = "skyys-quick-battles";
 const TEMPLATE = `modules/${MODULE_ID}/templates/quick-battles.hbs`;
+const CONFIG_TEMPLATE = `modules/${MODULE_ID}/templates/configuration.hbs`;
 const DEFAULT_CONFIG = {
   players: [],
   encounterGroups: [],
@@ -32,6 +33,7 @@ const DEFAULT_CONFIG = {
 };
 
 let mainApplication;
+let configurationApplication;
 let catalogPromise;
 let activeRunMessage;
 const inFlight = new Set();
@@ -186,6 +188,78 @@ async function writeConfig(config) {
   return normalized;
 }
 
+function readConfigurationForm(element) {
+  const field = (row, name) => row.querySelector(`[data-field="${name}"]`);
+  const text = (row, name) => field(row, name)?.value.trim() ?? "";
+  const number = (row, name) => Number(field(row, name)?.value);
+  const optionalNumber = (row, name) => {
+    const value = field(row, name)?.value;
+    return value == null || value.trim() === "" ? {} : { [name]: Number(value) };
+  };
+  const rows = (collection) => Array.from(element.querySelectorAll(`[data-config-collection="${collection}"] [data-config-row]`));
+  const config = clone(DEFAULT_CONFIG);
+
+  config.players = rows("players").map((row) => ({
+    userId: text(row, "userId"),
+    actorUuid: text(row, "actorUuid")
+  }));
+  config.encounterGroups = rows("encounterGroups").map((row) => ({
+    id: text(row, "id"),
+    name: text(row, "name")
+  }));
+  config.encounters = rows("encounters").map((row) => {
+    const id = text(row, "id");
+    return {
+      ...(id ? { id } : {}),
+      name: text(row, "name"),
+      description: text(row, "description"),
+      groups: Array.from(row.querySelectorAll('[data-field="groups"]:checked')).map((input) => input.value),
+      ...optionalNumber(row, "dc"),
+      difficultyLabel: text(row, "difficultyLabel"),
+      roster: Array.from(row.querySelectorAll("[data-roster-row]")).map((member) => ({
+        actorUuid: text(member, "actorUuid"),
+        name: text(member, "name"),
+        count: number(member, "count")
+      })).filter((member) => member.actorUuid || member.name)
+    };
+  });
+  config.encounterDifficultyBands = rows("encounterDifficultyBands").map((row) => ({
+    min: number(row, "min"),
+    max: number(row, "max"),
+    label: text(row, "label"),
+    dc: number(row, "dc"),
+    ...(field(row, "combat")?.checked ? { combat: true } : {})
+  }));
+  config.catalogOverrides = rows("catalogOverrides").map((row) => ({
+    name: text(row, "name"),
+    type: text(row, "type"),
+    rating: text(row, "rating"),
+    disabled: field(row, "disabled")?.checked ?? false,
+    ...optionalNumber(row, "bonus"),
+    ...optionalNumber(row, "bonusPerUse")
+  }));
+  config.fateDcs = {
+    easy: number(element, "fateDcEasy"),
+    medium: number(element, "fateDcMedium"),
+    hard: number(element, "fateDcHard")
+  };
+  config.campBonus = number(element, "campBonus");
+  config.paceModifiers = {
+    fast: number(element, "paceFast"),
+    normal: number(element, "paceNormal"),
+    slow: number(element, "paceSlow")
+  };
+  config.spellSlotBonuses = Object.fromEntries(
+    Array.from({ length: 9 }, (_, index) => {
+      const level = index + 1;
+      return [level, number(element, `spellSlot${level}`)];
+    })
+  );
+  config.damageCap = number(element, "damageCap");
+  config.postGmResults = field(element, "postGmResults")?.checked ?? false;
+  return config;
+}
+
 async function loadCatalog() {
   if (!catalogPromise) {
     catalogPromise = (async () => {
@@ -209,6 +283,14 @@ function registerModuleSettings() {
     config: false,
     type: String,
     default: JSON.stringify(DEFAULT_CONFIG)
+  });
+  game.settings.registerMenu(MODULE_ID, "configurationMenu", {
+    name: "Quick Battles configuration",
+    label: "Configure",
+    hint: "Set up player characters, encounters, and Quick Battles rules.",
+    icon: "fas fa-sliders",
+    type: QuickBattlesConfigurationApplication,
+    restricted: true
   });
 
   if (!Handlebars.helpers.signed) {
@@ -458,10 +540,139 @@ async function openMainApplication() {
   const config = await readConfig();
   await effectiveCatalog(config);
   mainApplication ??= new QuickBattlesApplication({ mode: "gm" });
-  await mainApplication.render(true);
+  await mainApplication.render({ force: true });
 }
 
-class QuickBattlesApplication extends foundry.applications.api.ApplicationV2 {
+async function openConfiguration() {
+  if (!game.user.isGM) throw new Error("Only a GM can configure Quick Battles.");
+  configurationApplication ??= new QuickBattlesConfigurationApplication();
+  await configurationApplication.render({ force: true });
+}
+
+class QuickBattlesConfigurationApplication extends foundry.applications.api.HandlebarsApplicationMixin(
+  foundry.applications.api.ApplicationV2
+) {
+  static DEFAULT_OPTIONS = {
+    id: `${MODULE_ID}-configuration`,
+    classes: ["quick-battles-app", "quick-battles-config"],
+    position: { width: 720, height: "auto" },
+    window: { title: "Quick Battles Configuration", resizable: true }
+  };
+
+  static PARTS = {
+    main: { template: CONFIG_TEMPLATE }
+  };
+
+  constructor(options = {}) {
+    super(options);
+    configurationApplication = this;
+    this.configDraft = null;
+  }
+
+  async _prepareContext() {
+    if (!game.user.isGM) throw new Error("Only a GM can configure Quick Battles.");
+    const config = this.configDraft ?? await readConfig();
+    const users = Array.from(game.users)
+      .filter((user) => !user.isGM)
+      .map((user) => ({ id: user.id, name: user.name }));
+    const actors = sortActors().map((actor) => ({ uuid: actor.uuid, name: actor.name }));
+    const withSelectedOption = (options, selected, valueKey) => {
+      const prepared = options.map((option) => ({ ...option, selected: option[valueKey] === selected }));
+      if (selected && !prepared.some((option) => option[valueKey] === selected)) {
+        prepared.unshift({ [valueKey]: selected, name: `Unavailable: ${selected}`, selected: true });
+      }
+      return prepared;
+    };
+    const preparedConfig = {
+      ...config,
+      players: config.players.map((player) => ({
+        ...player,
+        users: withSelectedOption(users, player.userId, "id"),
+        actors: withSelectedOption(actors, player.actorUuid, "uuid")
+      })),
+      encounters: config.encounters.map((encounter) => ({
+        ...encounter,
+        groupOptions: config.encounterGroups.map((group) => ({
+          ...group,
+          selected: encounter.groups.includes(group.id)
+        })),
+        roster: (encounter.roster ?? []).map((member) => ({
+          ...member,
+          actorUuid: member.actorUuid ?? game.actors.get(member.actorId)?.uuid ?? "",
+          actors: withSelectedOption(actors, member.actorUuid ?? game.actors.get(member.actorId)?.uuid, "uuid")
+        }))
+      })),
+      encounterDifficultyBands: config.encounterDifficultyBands.map((band) => ({
+        ...band,
+        isCombat: band.combat === true
+      })),
+      catalogOverrides: config.catalogOverrides.map((override) => ({
+        ...override,
+        isPassive: override.type === "Passive",
+        isActive: override.type === "Active",
+        isLow: override.rating === "Low",
+        isMedium: override.rating === "Medium",
+        isHigh: override.rating === "High"
+      })),
+      spellSlots: Array.from({ length: 9 }, (_, index) => {
+        const level = index + 1;
+        return { level, bonus: config.spellSlotBonuses[level] };
+      })
+    };
+    return { config: preparedConfig, users, actors };
+  }
+
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    if (this.element?.dataset.qbConfigBound) return;
+    this.element.dataset.qbConfigBound = "true";
+    this.element.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-app-action]");
+      if (!button) return;
+      event.preventDefault();
+      this._handleConfigurationAction(button).catch(notifyError);
+    });
+  }
+
+  async _handleConfigurationAction(button) {
+    const action = button.dataset.appAction;
+    if (action === "save-config") {
+      if (!this.element.querySelector(".qb-configuration-form").reportValidity()) return;
+      this.configDraft = await writeConfig(readConfigurationForm(this.element));
+      ui.notifications.info("Quick Battles configuration saved.");
+      mainApplication?.render();
+      return this.render();
+    }
+    if (action === "remove-row") {
+      button.closest("[data-config-row], [data-roster-row]")?.remove();
+      return;
+    }
+    this.configDraft = readConfigurationForm(this.element);
+    if (action === "add-player") this.configDraft.players.push({ userId: "", actorUuid: "" });
+    else if (action === "add-group") this.configDraft.encounterGroups.push({ id: randomId(), name: "" });
+    else if (action === "add-encounter") {
+      this.configDraft.encounters.push({
+        id: randomId(),
+        name: "",
+        description: "",
+        groups: this.configDraft.encounterGroups[0] ? [this.configDraft.encounterGroups[0].id] : [],
+        roster: []
+      });
+    } else if (action === "add-band") {
+      this.configDraft.encounterDifficultyBands.push({ min: 1, max: 0, label: "", dc: 0 });
+    } else if (action === "add-override") {
+      this.configDraft.catalogOverrides.push({ name: "", type: "Active", rating: "Low" });
+    } else if (action === "add-roster") {
+      const encounterIndex = Number(button.closest("[data-config-row]").dataset.index);
+      this.configDraft.encounters[encounterIndex].roster.push({ actorUuid: "", name: "", count: 1 });
+    }
+    return this.render();
+  }
+}
+
+class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplicationMixin(
+  foundry.applications.api.ApplicationV2
+) {
   static DEFAULT_OPTIONS = {
     id: `${MODULE_ID}-window`,
     classes: ["quick-battles-app"],
@@ -481,7 +692,6 @@ class QuickBattlesApplication extends foundry.applications.api.ApplicationV2 {
       window: { title: isParticipant ? "Quick Battle check" : "Quick Battles", resizable: true }
     });
     this.mode = options.mode ?? "gm";
-    this.showConfig = false;
   }
 
   async _prepareContext() {
@@ -515,8 +725,6 @@ class QuickBattlesApplication extends foundry.applications.api.ApplicationV2 {
     return {
       isParticipant: false,
       config,
-      configJson: JSON.stringify(config, null, 2),
-      showConfig: this.showConfig,
       groups: config.encounterGroups,
       actors,
       rolls,
@@ -577,24 +785,7 @@ class QuickBattlesApplication extends foundry.applications.api.ApplicationV2 {
     if (action === "start-fate") return this._startFate();
     if (action === "choose-encounter") return this._chooseEncounter();
     if (action === "start-checks") return this._startChecks();
-    if (action === "toggle-config") {
-      this.showConfig = !this.showConfig;
-      return this.render();
-    }
-    if (action === "save-config") return this._saveConfiguration();
-  }
-
-  async _saveConfiguration() {
-    const textarea = this.element.querySelector(".qb-config");
-    let parsed;
-    try {
-      parsed = JSON.parse(textarea.value);
-    } catch (error) {
-      throw new Error(`Configuration JSON is invalid: ${error.message}`);
-    }
-    await writeConfig(parsed);
-    ui.notifications.info("Quick Battles configuration saved.");
-    return this.render();
+    if (action === "open-config") return openConfiguration();
   }
 
   async _startFate() {
@@ -1022,7 +1213,7 @@ async function openParticipantApplication(checkId) {
     });
     participantApplications.set(checkId, application);
   }
-  await application.render(true);
+  await application.render({ force: true });
 }
 
 function handleIncomingPrompt(message) {
