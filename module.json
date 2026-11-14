@@ -2,7 +2,7 @@
   "id": "skyys-quick-battles",
   "title": "Skyy's Quick Battles",
   "description": "A lightweight, Foundry-native workflow for travel threats, encounter selection, and resource-powered checks.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "compatibility": {
     "minimum": "14",
     "verified": "14"
@@ -24,5 +24,7 @@
   ],
   "styles": [
     "styles/quick-battles.css"
-  ]
+  ],
+  "manifest": "https://github.com/carelvhza/skyys-quick-battles/releases/latest/download/module.json",
+  "download": "https://github.com/carelvhza/skyys-quick-battles/releases/latest/download/skyys-quick-battles.zip"
 }
