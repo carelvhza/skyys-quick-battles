@@ -145,6 +145,15 @@ export function d20ModifierParts(modifier) {
   return value === 0 ? [] : [String(value)];
 }
 
+export function submittedRollTotal(rollData, deserializeRoll) {
+  const roll = typeof rollData === "string" ? deserializeRoll(rollData) : rollData;
+  const total = Number(roll?.total);
+  if (!roll || !Number.isFinite(total)) {
+    throw new Error("The submitted message has no valid Foundry roll.");
+  }
+  return total;
+}
+
 export function spellSlotBonus(spends, bonusesByLevel = {}) {
   return Object.entries(spends).reduce((total, [level, count]) => {
     return total + Math.max(0, Math.floor(finiteNumber(count))) * finiteNumber(bonusesByLevel[level], 0);
