@@ -14,6 +14,30 @@ import {
 } from "../scripts/logic.js";
 
 const catalogText = await readFile(new URL("../data/feat-catalog.csv", import.meta.url), "utf8");
+const [applicationSource, configurationTemplate, mainTemplate] = await Promise.all([
+  readFile(new URL("../scripts/quick-battles.js", import.meta.url), "utf8"),
+  readFile(new URL("../templates/configuration.hbs", import.meta.url), "utf8"),
+  readFile(new URL("../templates/quick-battles.hbs", import.meta.url), "utf8")
+]);
+
+test("Foundry V14 application implements the Handlebars rendering contract", () => {
+  assert.match(
+    applicationSource,
+    /class QuickBattlesApplication extends foundry\.applications\.api\.HandlebarsApplicationMixin\(\s*foundry\.applications\.api\.ApplicationV2\s*\)/
+  );
+  assert.match(applicationSource, /mainApplication\.render\(\{ force: true \}\)/);
+  assert.match(applicationSource, /application\.render\(\{ force: true \}\)/);
+});
+
+test("configuration is available through a structured Foundry settings menu", () => {
+  assert.match(applicationSource, /game\.settings\.registerMenu\(MODULE_ID, "configurationMenu"/);
+  assert.match(configurationTemplate, /data-field="userId"/);
+  assert.match(configurationTemplate, /data-field="actorUuid"/);
+  assert.match(configurationTemplate, /data-config-collection="encounters"/);
+  assert.match(configurationTemplate, /data-field="fateDcEasy"/);
+  assert.match(configurationTemplate, /data-config-collection="catalogOverrides"/);
+  assert.doesNotMatch(mainTemplate, /class="qb-config"/);
+});
 
 test("the supplied feat catalog is parsed in full, including comma-containing descriptions", () => {
   const catalog = parseFeatCatalog(catalogText);

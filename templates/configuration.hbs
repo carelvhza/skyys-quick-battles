@@ -1,0 +1,164 @@
+<form class="qb-shell qb-configuration-form">
+  <p class="qb-muted">These settings are saved for your GM account in this world.</p>
+
+  <section class="qb-section">
+    <h2>Player characters</h2>
+    <div class="qb-config-rows" data-config-collection="players">
+      {{#each config.players}}
+        <fieldset data-config-row>
+          <label class="qb-field">
+            <span>Player</span>
+            <select data-field="userId">
+              <option value="">Select a player</option>
+              {{#each users}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+            </select>
+          </label>
+          <label class="qb-field">
+            <span>Main character</span>
+            <select data-field="actorUuid">
+              <option value="">Select a character</option>
+              {{#each actors}}<option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+            </select>
+          </label>
+          <button type="button" class="qb-secondary" data-app-action="remove-row">Remove player</button>
+        </fieldset>
+      {{/each}}
+    </div>
+    <button type="button" class="qb-secondary" data-app-action="add-player">Add player</button>
+  </section>
+
+  <section class="qb-section">
+    <h2>Encounter groups</h2>
+    <div class="qb-config-rows" data-config-collection="encounterGroups">
+      {{#each config.encounterGroups}}
+        <fieldset data-config-row>
+          <label class="qb-field"><span>Group ID</span><input data-field="id" value="{{id}}" required /></label>
+          <label class="qb-field"><span>Display name</span><input data-field="name" value="{{name}}" required /></label>
+          <button type="button" class="qb-secondary" data-app-action="remove-row">Remove group</button>
+        </fieldset>
+      {{/each}}
+    </div>
+    <button type="button" class="qb-secondary" data-app-action="add-group">Add group</button>
+  </section>
+
+  <section class="qb-section">
+    <h2>Encounters</h2>
+    <div class="qb-config-rows" data-config-collection="encounters">
+      {{#each config.encounters}}
+        <fieldset data-config-row data-index="{{@index}}">
+          <input data-field="id" type="hidden" value="{{id}}" />
+          <label class="qb-field"><span>Encounter name</span><input data-field="name" value="{{name}}" required /></label>
+          <label class="qb-field"><span>Description</span><textarea data-field="description" rows="2">{{description}}</textarea></label>
+          <label class="qb-field"><span>Difficulty label override</span><input data-field="difficultyLabel" value="{{difficultyLabel}}" placeholder="Use the Fate difficulty" /></label>
+          <label class="qb-field"><span>DC override</span><input data-field="dc" type="number" value="{{dc}}" placeholder="Use the Fate difficulty" /></label>
+          <div class="qb-config-checks">
+            <span>Groups</span>
+            {{#each groupOptions}}
+              <label><input data-field="groups" type="checkbox" value="{{id}}" {{#if selected}}checked{{/if}} /> {{name}}</label>
+            {{else}}
+              <span class="qb-muted">Add an encounter group first.</span>
+            {{/each}}
+          </div>
+          <div class="qb-config-subsection">
+            <h3>GM roster guidance</h3>
+            <div class="qb-config-rows">
+              {{#each roster}}
+                <div data-roster-row>
+                  <label class="qb-field">
+                    <span>Actor</span>
+                    <select data-field="actorUuid">
+                      <option value="">Use a custom name</option>
+                      {{#each actors}}<option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+                    </select>
+                  </label>
+                  <label class="qb-field"><span>Custom name</span><input data-field="name" value="{{name}}" placeholder="Optional" /></label>
+                  <label class="qb-field"><span>Count</span><input data-field="count" type="number" min="1" step="1" value="{{count}}" required /></label>
+                  <button type="button" class="qb-secondary" data-app-action="remove-row">Remove roster entry</button>
+                </div>
+              {{/each}}
+            </div>
+            <button type="button" class="qb-secondary" data-app-action="add-roster">Add roster entry</button>
+          </div>
+          <button type="button" class="qb-secondary" data-app-action="remove-row">Remove encounter</button>
+        </fieldset>
+      {{/each}}
+    </div>
+    <button type="button" class="qb-secondary" data-app-action="add-encounter">Add encounter</button>
+  </section>
+
+  <section class="qb-section">
+    <h2>Fate and travel</h2>
+    <label class="qb-field"><span>Easy Fate DC</span><input data-field="fateDcEasy" type="number" value="{{config.fateDcs.easy}}" required /></label>
+    <label class="qb-field"><span>Medium Fate DC</span><input data-field="fateDcMedium" type="number" value="{{config.fateDcs.medium}}" required /></label>
+    <label class="qb-field"><span>Hard Fate DC</span><input data-field="fateDcHard" type="number" value="{{config.fateDcs.hard}}" required /></label>
+    <label class="qb-field"><span>Camp bonus</span><input data-field="campBonus" type="number" value="{{config.campBonus}}" required /></label>
+    <label class="qb-field"><span>Fast pace modifier</span><input data-field="paceFast" type="number" value="{{config.paceModifiers.fast}}" required /></label>
+    <label class="qb-field"><span>Regular pace modifier</span><input data-field="paceNormal" type="number" value="{{config.paceModifiers.normal}}" required /></label>
+    <label class="qb-field"><span>Slow pace modifier</span><input data-field="paceSlow" type="number" value="{{config.paceModifiers.slow}}" required /></label>
+  </section>
+
+  <section class="qb-section">
+    <h2>Encounter difficulty bands</h2>
+    <p class="qb-muted">Ranges must cover d20 results 1–20 contiguously, without gaps or overlaps.</p>
+    <div class="qb-config-rows" data-config-collection="encounterDifficultyBands">
+      {{#each config.encounterDifficultyBands}}
+        <fieldset data-config-row>
+          <label class="qb-field"><span>Minimum roll</span><input data-field="min" type="number" min="1" max="20" value="{{min}}" required /></label>
+          <label class="qb-field"><span>Maximum roll</span><input data-field="max" type="number" min="1" max="20" value="{{max}}" required /></label>
+          <label class="qb-field"><span>Label</span><input data-field="label" value="{{label}}" required /></label>
+          <label class="qb-field"><span>Encounter DC</span><input data-field="dc" type="number" value="{{dc}}" required /></label>
+          <label><input data-field="combat" type="checkbox" {{#if isCombat}}checked{{/if}} /> Combat band</label>
+          <button type="button" class="qb-secondary" data-app-action="remove-row">Remove band</button>
+        </fieldset>
+      {{/each}}
+    </div>
+    <button type="button" class="qb-secondary" data-app-action="add-band">Add difficulty band</button>
+  </section>
+
+  <section class="qb-section">
+    <h2>Spell slot bonuses</h2>
+    {{#each config.spellSlots}}
+      <label class="qb-field"><span>Level {{level}} slot</span><input data-field="spellSlot{{level}}" type="number" value="{{bonus}}" required /></label>
+    {{/each}}
+  </section>
+
+  <section class="qb-section">
+    <h2>Results and damage</h2>
+    <label class="qb-field"><span>Maximum damage fraction (0–1)</span><input data-field="damageCap" type="number" min="0" max="1" step="0.05" value="{{config.damageCap}}" required /></label>
+    <label><input data-field="postGmResults" type="checkbox" {{#if config.postGmResults}}checked{{/if}} /> Post GM results to chat</label>
+  </section>
+
+  <section class="qb-section">
+    <h2>Feature catalog changes</h2>
+    <p class="qb-muted">Add custom features, change a feature's type or bonus, or disable a catalog entry by name.</p>
+    <div class="qb-config-rows" data-config-collection="catalogOverrides">
+      {{#each config.catalogOverrides}}
+        <fieldset data-config-row>
+          <label class="qb-field"><span>Feature name</span><input data-field="name" value="{{name}}" required /></label>
+          <label class="qb-field">
+            <span>Type</span>
+            <select data-field="type">
+              <option value="Passive" {{#if isPassive}}selected{{/if}}>Passive</option>
+              <option value="Active" {{#if isActive}}selected{{/if}}>Active</option>
+            </select>
+          </label>
+          <label class="qb-field">
+            <span>Rating</span>
+            <select data-field="rating">
+              <option value="Low" {{#if isLow}}selected{{/if}}>Low (+1)</option>
+              <option value="Medium" {{#if isMedium}}selected{{/if}}>Medium (+2)</option>
+              <option value="High" {{#if isHigh}}selected{{/if}}>High (+3)</option>
+            </select>
+          </label>
+          <label class="qb-field"><span>Passive bonus override</span><input data-field="bonus" type="number" value="{{bonus}}" /></label>
+          <label class="qb-field"><span>Bonus per active use override</span><input data-field="bonusPerUse" type="number" value="{{bonusPerUse}}" /></label>
+          <label><input data-field="disabled" type="checkbox" {{#if disabled}}checked{{/if}} /> Disable this catalog entry</label>
+          <button type="button" class="qb-secondary" data-app-action="remove-row">Remove feature change</button>
+        </fieldset>
+      {{/each}}
+    </div>
+    <button type="button" class="qb-secondary" data-app-action="add-override">Add feature change</button>
+  </section>
+
+  <button type="button" class="qb-primary" data-app-action="save-config">Validate and save settings</button>
+</form>

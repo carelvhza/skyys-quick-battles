@@ -166,19 +166,14 @@
     {{else}}
       <div class="qb-section">
         <h2>Encounter data required</h2>
-        <p class="qb-muted">Add encounter groups and entries in the configuration editor below.</p>
+        <p class="qb-muted">Add encounter groups and entries in Game Settings → Module Settings → Quick Battles configuration.</p>
       </div>
     {{/if}}
 
     <div class="qb-section">
-      <button class="qb-link" type="button" data-app-action="toggle-config">Edit configuration</button>
-      {{#if showConfig}}
-        <label class="qb-field">
-          <span>GM-only JSON configuration</span>
-          <textarea class="qb-config" rows="18" spellcheck="false">{{configJson}}</textarea>
-        </label>
-        <button class="qb-secondary" type="button" data-app-action="save-config">Validate and save</button>
-      {{/if}}
+      <h2>Configuration</h2>
+      <p class="qb-muted">Manage players, encounters, and rules with the structured settings form.</p>
+      <button class="qb-secondary" type="button" data-app-action="open-config">Open configuration settings</button>
     </div>
   {{/if}}
 </section>
