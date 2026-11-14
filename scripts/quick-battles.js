@@ -1,12 +1,15 @@
 import {
   averageRoundedDown,
+  availableSpellSlots,
   calculatePassiveBonuses,
+  chatMessageAuthorId,
   d20ModifierParts,
   encounterBand,
   failureDamage,
   itemUses,
   mergeCatalog,
   parseFeatCatalog,
+  resourceBonus,
   selectedCatalogBonuses,
   spellSlotBonus,
   submittedRollTotal
@@ -435,15 +438,7 @@ function participantPreview(actor, catalog, config) {
   });
   const hp = Number(actor.system?.attributes?.hp?.value) || 0;
   const maxHp = Number(actor.system?.attributes?.hp?.max) || 0;
-  const spellSlots = Array.from({ length: 9 }, (_, index) => {
-    const level = index + 1;
-    const slot = actor.system?.spells?.[`spell${level}`];
-    return {
-      level,
-      available: Math.max(0, Number(slot?.value) || 0),
-      bonus: Number(config.spellSlotBonuses[level]) || 0
-    };
-  });
+  const spellSlots = availableSpellSlots(actor.system?.spells, config.spellSlotBonuses);
   const spells = items
     .filter((item) => item.type === "spell")
     .map((item) => ({ name: item.name, level: Number(item.system?.level) || 0 }))
@@ -484,7 +479,9 @@ function displayRollResult(run) {
   const difficulty = result.difficulty
     ? `<div>${escapeHtml(result.difficulty.label)} · DC ${escapeHtml(result.difficulty.dc)}</div>`
     : "";
-  const watch = result.watchShift ? `<div>Watch shift ${result.watchShift}</div>` : "";
+  const watch = result.situation === "camp" && result.watchShift
+    ? `<div>Watch shift ${result.watchShift}</div>`
+    : "";
   const threatType = result.threatType ? `<div>Threat type roll: ${result.threatType}</div>` : "";
   return `<section class="qb-result"><strong>${escapeHtml(result.label)}</strong><div>${result.total} vs DC ${run.fate.dc}</div>${difficulty}${watch}${threatType}</section>`;
 }
@@ -498,6 +495,34 @@ function findMessageByFlag(type, key, value) {
     const flag = message.flags?.[MODULE_ID];
     return flag?.type === type && flag?.[key] === value;
   }) ?? null;
+}
+
+function findParticipantSubmission(checkId) {
+  return findMessageByFlag("participant-submission", "checkId", checkId);
+}
+
+function removeOpenCheckButton(checkId) {
+  const selector = `[data-card-action="open-check"][data-check-id="${CSS.escape(checkId)}"]`;
+  for (const button of document.querySelectorAll(selector)) button.remove();
+}
+
+function hideSubmittedCheckAction(message, html) {
+  const flag = message.flags?.[MODULE_ID];
+  if (flag?.type !== "check-prompt") return;
+  if (flag.status === "pending" && !findParticipantSubmission(flag.checkId)) return;
+  const root = html instanceof HTMLElement ? html : html?.[0];
+  root?.querySelector(`[data-card-action="open-check"][data-check-id="${CSS.escape(flag.checkId)}"]`)?.remove();
+}
+
+function updateActiveBonusPreview(element) {
+  const preview = element.querySelector("[data-active-bonus-preview]");
+  if (!preview) return;
+  const entries = Array.from(element.querySelectorAll("[data-bonus-count]")).map((input) => ({
+    count: input.value,
+    bonusPerUse: input.dataset.bonusPerUse
+  }));
+  const bonus = resourceBonus(entries);
+  preview.textContent = `Active bonus: ${bonus >= 0 ? "+" : ""}${bonus}`;
 }
 
 function createButton(label, action, attributes = "") {
@@ -846,10 +871,11 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       const item = actor.items.get(option.itemId);
       return { ...option, available: itemUses(item).available };
     }).filter((option) => option.available > 0);
-    const spellSlots = expected.spellSlots.map((slot) => ({
-      ...slot,
-      available: Math.max(0, Number(actor.system?.spells?.[`spell${slot.level}`]?.value) || 0)
-    }));
+    const currentSpellSlots = availableSpellSlots(actor.system?.spells);
+    const spellSlots = expected.spellSlots.flatMap((slot) => {
+      const current = currentSpellSlots.find((entry) => entry.level === slot.level);
+      return current ? [{ ...slot, available: current.available }] : [];
+    });
     return {
       isParticipant: true,
       checkId: payload.checkId,
@@ -881,6 +907,12 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
         rememberSelection({ encounterGroupId: field.value }).catch(notifyError);
       }
     });
+    this.element.addEventListener("input", (event) => {
+      if (this.mode === "participant" && event.target.matches("[data-bonus-count]")) {
+        updateActiveBonusPreview(this.element);
+      }
+    });
+    if (this.mode === "participant") updateActiveBonusPreview(this.element);
   }
 
   async _handleAppAction(action) {
@@ -1172,6 +1204,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
           }
         }
       });
+      removeOpenCheckButton(checkId);
       await this.close();
     } finally {
       inFlight.delete(lockKey);
@@ -1229,8 +1262,8 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
 
 function renderParticipantResult(details, damageApplied) {
   const result = details.passed
-    ? "<strong>SUCCESS</strong>"
-    : `<strong>FAILED by ${details.margin}</strong>`;
+    ? `<strong class="qb-check-outcome">SUCCESS</strong>`
+    : `<strong class="qb-check-outcome">FAILED by ${details.margin}</strong>`;
   const signed = (value) => `${Number(value) >= 0 ? "+" : ""}${Number(value) || 0}`;
   const passiveBreakdown = [
     `${details.passive.abilityName} ${signed(details.passive.ability)}`,
@@ -1253,7 +1286,7 @@ function renderParticipantResult(details, damageApplied) {
     `<header><img src="${escapeHtml(details.actorImg)}" alt="" /><h3>${escapeHtml(details.actorName)} vs DC ${details.dc}</h3></header>
      <div>Passive: ${signed(details.passive.total)} (${passiveBreakdown})</div>
      <div>Active: ${signed(details.activeBonus)} · Spell slots: ${signed(details.slotBonus)} · Situation: ${signed(details.situational)}</div>
-     <div>Roll: ${details.total} (1d20 ${details.totalModifier < 0 ? "-" : "+"} ${Math.abs(details.totalModifier)}) · ${result}</div>${spent}${damage}`,
+     <div class="qb-check-roll">Roll <strong>${details.total}</strong> vs DC ${details.dc} · ${result}</div>${spent}${damage}`,
     details.passed ? "qb-check-success" : "qb-check-failure"
   );
 }
@@ -1329,7 +1362,10 @@ async function submitStealthRoll(runId, requestId, actorUuid, userId) {
 async function openParticipantApplication(checkId) {
   const prompt = findMessageByFlag("check-prompt", "checkId", checkId);
   const payload = prompt?.flags?.[MODULE_ID];
-  if (!payload || payload.status !== "pending") throw new Error("This participant check is no longer pending.");
+  if (!payload || payload.status !== "pending" || findParticipantSubmission(checkId)) {
+    removeOpenCheckButton(checkId);
+    throw new Error("This participant check is no longer pending.");
+  }
   const actor = await actorByUuid(payload.actorUuid);
   if (!game.user.isGM && !actor.testUserPermission(game.user, "OWNER")) {
     ui.notifications.warn(`You do not own ${actor.name}.`);
@@ -1350,6 +1386,7 @@ async function openParticipantApplication(checkId) {
 function handleIncomingPrompt(message) {
   const flag = message.flags?.[MODULE_ID];
   if (!flag) return;
+  if (flag.type === "participant-submission") removeOpenCheckButton(flag.checkId);
   const recipients = Array.from(message.whisper ?? []);
   const privateMessage = recipients.length > 0;
   if (privateMessage && !recipients.some((recipient) => (recipient.id ?? recipient) === game.user.id)) return;
@@ -1382,7 +1419,7 @@ function submittedRoll(message) {
 }
 
 async function processFateSubmission(message, data) {
-  const userId = message.author?._id ?? message.author?._id;
+  const userId = chatMessageAuthorId(message);
   const submitter = game.users.get(userId);
   if (!submitter || userId !== data.userId) {
     if (!submitter?.isGM) {
@@ -1406,7 +1443,7 @@ async function processFateSubmission(message, data) {
 }
 
 async function processStealthSubmission(message, data) {
-  const userId = message.author?._id ?? message.author?._id;
+  const userId = chatMessageAuthorId(message);
   const actor = await actorByUuid(data.actorUuid);
   const submitter = game.users.get(userId);
   if (!submitter || (!submitter.isGM && !actor.testUserPermission(submitter, "OWNER"))) {
@@ -1468,6 +1505,8 @@ async function finishFate(run, message) {
     total,
     failed,
     label: failed ? "Threat detected" : "No threats",
+    situation: run.fate.situation,
+    showWatchShift: run.fate.situation === "camp" && watchShift != null,
     difficulty,
     threatType,
     watchShift
@@ -1493,7 +1532,7 @@ async function finishFate(run, message) {
 }
 
 async function processParticipantSubmission(message, data) {
-  const userId = message.user?.id ?? message.user;
+  const userId = chatMessageAuthorId(message);
   const actor = await actorByUuid(data.actorUuid);
   const submitter = game.users.get(userId);
   if (!submitter || (!submitter.isGM && !actor.testUserPermission(submitter, "OWNER"))) {
@@ -1534,7 +1573,12 @@ async function processParticipantSubmission(message, data) {
   check.damageApplied = false;
 
   const prompt = game.messages.get(check.promptId);
-  if (prompt) await prompt.delete();
+  if (prompt) {
+    await prompt.update({
+      content: chatCard(`<h3>Quick Battle check · ${escapeHtml(actor.name)}</h3><p>Check submitted. Resource selection is closed.</p>`),
+      [`flags.${MODULE_ID}.status`]: "submitted"
+    });
+  }
   const allResolved = Object.values(current.run.checks).every((entry) => ["passed", "failed"].includes(entry.status));
   if (allResolved) current.run.status = "checks-resolved";
   await persistRun(current.run, current.message);
@@ -1565,6 +1609,10 @@ async function createDamageControl(run, actor, resultMessage, details) {
 
 async function applyDamage(operationId) {
   if (!game.user.isGM) throw new Error("Only a GM can apply damage.");
+  const activeGM = game.users.activeGM;
+  if (activeGM && activeGM.id !== game.user.id) {
+    throw new Error("Only the active GM can apply damage.");
+  }
   const control = findMessageByFlag("damage-control", "operationId", operationId);
   const payload = control?.flags?.[MODULE_ID];
   if (!payload) throw new Error("Damage control was not found.");
@@ -1588,6 +1636,12 @@ async function applyDamage(operationId) {
             [`flags.${MODULE_ID}.damageApplied`]: true
           });
         }
+      }
+      const current = await currentRun(payload.runId);
+      const check = current?.run.checks?.[payload.actorUuid];
+      if (check && !check.damageApplied) {
+        check.damageApplied = true;
+        await persistRun(current.run, current.message);
       }
       return;
     }
@@ -1634,6 +1688,7 @@ Hooks.once("init", registerModuleSettings);
 Hooks.once("ready", () => {
   bindChatActions();
   loadCatalog().catch(notifyError);
+  Hooks.on("renderChatMessage", hideSubmittedCheckAction);
   Hooks.on("createChatMessage", (message) => handleIncomingPrompt(message));
   Hooks.on("createChatMessage", (message) => {
     console.log('[skyy] hooked');
