@@ -160,6 +160,33 @@ export function spellSlotBonus(spends, bonusesByLevel = {}) {
   }, 0);
 }
 
+export function availableSpellSlots(spells = {}, bonusesByLevel = {}) {
+  return Array.from({ length: 9 }, (_, index) => {
+    const level = index + 1;
+    const slot = spells[`spell${level}`];
+    const capacity = Math.max(0, finiteNumber(slot?.max ?? slot?.override, 0));
+    if (capacity === 0) return null;
+    return {
+      level,
+      capacity,
+      available: Math.min(capacity, Math.max(0, finiteNumber(slot?.value, 0))),
+      bonus: finiteNumber(bonusesByLevel[level], 0)
+    };
+  }).filter(Boolean);
+}
+
+export function resourceBonus(entries = []) {
+  return entries.reduce((total, entry) => {
+    return total + Math.max(0, Math.floor(finiteNumber(entry.count))) * finiteNumber(entry.bonusPerUse);
+  }, 0);
+}
+
+export function chatMessageAuthorId(message) {
+  const author = message?.author;
+  if (typeof author === "string") return author;
+  return author?.id ?? author?._id ?? message?.user?.id ?? message?.user ?? null;
+}
+
 export function encounterBand(roll, bands) {
   const value = Math.floor(finiteNumber(roll, -1));
   const band = bands.find(({ min, max }) => value >= min && value <= max);

@@ -3,13 +3,16 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   averageRoundedDown,
+  availableSpellSlots,
   calculatePassiveBonuses,
+  chatMessageAuthorId,
   d20ModifierParts,
   encounterBand,
   failureDamage,
   itemUses,
   mergeCatalog,
   parseFeatCatalog,
+  resourceBonus,
   selectedCatalogBonuses,
   spellSlotBonus,
   submittedRollTotal
@@ -96,6 +99,30 @@ test("runs can be cancelled and native roll submissions recover from processing 
   assert.match(applicationSource, /function enqueueSubmission\(operation\)/);
 });
 
+test("participant checks close recovery after submission and restrict damage to the active GM", () => {
+  assert.match(applicationSource, /findParticipantSubmission\(checkId\)/);
+  assert.match(applicationSource, /removeOpenCheckButton\(checkId\)/);
+  assert.match(applicationSource, /flags\.\$\{MODULE_ID\}\.status`]: "submitted"/);
+  assert.match(applicationSource, /async function processParticipantSubmission\(message, data\) \{\s*const userId = chatMessageAuthorId\(message\);/);
+  assert.match(applicationSource, /Only the active GM can apply damage/);
+  assert.match(applicationSource, /appliedDamageIds/);
+  assert.match(applicationSource, /check\.damageApplied = true/);
+  assert.match(applicationSource, /Hooks\.on\("renderChatMessage", hideSubmittedCheckAction\)/);
+});
+
+test("Fate result shows Watch Shift only for camp", () => {
+  assert.match(applicationSource, /result\.situation === "camp" && result\.watchShift/);
+  assert.match(applicationSource, /showWatchShift: run\.fate\.situation === "camp"/);
+  assert.match(mainTemplate, /state\.fateResult\.showWatchShift/);
+});
+
+test("participant bonus preview updates from resource-count input changes", () => {
+  assert.match(mainTemplate, /data-active-bonus-preview role="status" aria-live="polite"/);
+  assert.match(mainTemplate, /data-bonus-count data-bonus-per-use=/);
+  assert.match(applicationSource, /addEventListener\("input", \(event\) => \{[\s\S]*?updateActiveBonusPreview/);
+  assert.match(applicationSource, /preview\.textContent = `Active bonus:/);
+});
+
 test("the supplied feat catalog is parsed in full, including comma-containing descriptions", () => {
   const catalog = parseFeatCatalog(catalogText);
   assert.equal(catalog.length, 384);
@@ -146,6 +173,37 @@ test("group Stealth average rounds down", () => {
 
 test("spell slots multiply by their configured bonus", () => {
   assert.equal(spellSlotBonus({ 1: 2, 4: 1, 9: 1 }, { 1: 1, 4: 2, 9: 4 }), 8);
+});
+
+test("spell slot levels include used capacity but hide levels with no capacity", () => {
+  assert.deepEqual(
+    availableSpellSlots({
+      spell1: { value: 0, max: 2 },
+      spell2: { value: 1, max: 2 },
+      spell3: { value: 0, max: 0 },
+      spell4: { value: 1, override: 1 }
+    }, { 1: 1, 2: 1, 4: 2 }),
+    [
+      { level: 1, capacity: 2, available: 0, bonus: 1 },
+      { level: 2, capacity: 2, available: 1, bonus: 1 },
+      { level: 4, capacity: 1, available: 1, bonus: 2 }
+    ]
+  );
+});
+
+test("live active resource bonus sums selected feature uses and spell slots", () => {
+  assert.equal(resourceBonus([
+    { count: 2, bonusPerUse: 1 },
+    { count: 1, bonusPerUse: 3 }
+  ]), 5);
+  assert.equal(resourceBonus([{ count: "", bonusPerUse: 4 }]), 0);
+});
+
+test("chat submission author lookup prefers the Foundry author identity", () => {
+  assert.equal(chatMessageAuthorId({ author: { _id: "author-id" }, user: "legacy-id" }), "author-id");
+  assert.equal(chatMessageAuthorId({ author: { id: "document-id" } }), "document-id");
+  assert.equal(chatMessageAuthorId({ user: { id: "user-id" } }), "user-id");
+  assert.equal(chatMessageAuthorId({ user: "legacy-id" }), "legacy-id");
 });
 
 test("difficulty bands and capped failure damage use the specified thresholds", () => {

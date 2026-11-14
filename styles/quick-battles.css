@@ -254,6 +254,58 @@
   min-height: 1.8rem;
 }
 
+.qb-check-roll {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--color-cool-5) 65%, transparent);
+  font-size: 1.05rem;
+}
+
+.qb-check-roll > strong:first-child {
+  font-size: 1.3rem;
+}
+
+.qb-check-outcome {
+  margin-left: auto;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+}
+
+.qb-check-failure {
+  border-left: 4px solid var(--color-level-error, #a61f1f);
+  background: color-mix(in srgb, var(--color-level-error, #a61f1f) 10%, var(--color-cool-5));
+}
+
+.qb-check-failure .qb-check-outcome {
+  color: var(--color-level-error, #a61f1f);
+}
+
+.qb-check-success {
+  border-left: 4px solid var(--color-level-success, #287a3d);
+  background: color-mix(in srgb, var(--color-level-success, #287a3d) 10%, var(--color-cool-5));
+}
+
+.qb-check-success .qb-check-outcome {
+  color: var(--color-level-success, #287a3d);
+}
+
+.qb-active-bonus-preview {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 0.55rem;
+  border: 1px solid var(--color-warm-1);
+  border-radius: 0.3rem;
+  background: var(--color-cool-5);
+  font-weight: 700;
+  text-align: center;
+}
+
 @media (max-width: 32rem) {
   .qb-field {
     grid-template-columns: 1fr;

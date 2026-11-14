@@ -35,7 +35,7 @@
             {{#each activeItems}}
               <label class="qb-resource-row">
                 <span>{{name}} <small>+{{bonusPerUse}} each · {{available}} available</small></span>
-                <input name="active-{{itemId}}" type="number" min="0" max="{{available}}" value="0" />
+                <input name="active-{{itemId}}" type="number" min="0" max="{{available}}" value="0" data-bonus-count data-bonus-per-use="{{bonusPerUse}}" />
               </label>
             {{/each}}
           </div>
@@ -46,14 +46,18 @@
 
       <div class="qb-panel">
         <h3>Spell slots</h3>
-        <div class="qb-resource-list">
-          {{#each spellSlots}}
-            <label class="qb-resource-row">
-              <span>Level {{level}} <small>+{{bonus}} each · {{available}} available</small></span>
-              <input name="slot-{{level}}" type="number" min="0" max="{{available}}" value="0" {{#unless available}}disabled{{/unless}} />
-            </label>
-          {{/each}}
-        </div>
+        {{#if spellSlots.length}}
+          <div class="qb-resource-list">
+            {{#each spellSlots}}
+              <label class="qb-resource-row">
+                <span>Level {{level}} <small>+{{bonus}} each · {{available}} available</small></span>
+                <input name="slot-{{level}}" type="number" min="0" max="{{available}}" value="0" data-bonus-count data-bonus-per-use="{{bonus}}" {{#unless available}}disabled{{/unless}} />
+              </label>
+            {{/each}}
+          </div>
+        {{else}}
+          <p class="qb-muted">No spell-slot capacity on this actor.</p>
+        {{/if}}
         <details class="qb-spells">
           <summary>Known spells ({{spells.length}})</summary>
           {{#each spells}}
@@ -64,6 +68,7 @@
         </details>
       </div>
 
+      <p class="qb-active-bonus-preview" data-active-bonus-preview role="status" aria-live="polite" aria-atomic="true">Active bonus: +0</p>
       <button class="qb-primary" type="button" data-app-action="submit-check">Roll and submit vs DC {{dc}}</button>
     </form>
   {{else}}
@@ -114,7 +119,9 @@
             <span>Base roll {{state.fateResult.baseRoll}} · pace {{signed state.fateResult.paceModifier}} · situation {{signed state.fateResult.situational}} · camp {{signed state.fateResult.campModifier}}</span>
             {{#if state.fateResult.failed}}
               <span>{{state.fateResult.difficulty.label}} · DC {{state.fateResult.difficulty.dc}}</span>
-              {{#if state.fateResult.watchShift}}<span>Watch shift {{state.fateResult.watchShift}}</span>{{/if}}
+              {{#if state.fateResult.showWatchShift}}
+                {{#if state.fateResult.watchShift}}<span>Watch shift {{state.fateResult.watchShift}}</span>{{/if}}
+              {{/if}}
             {{/if}}
           </div>
         {{/if}}
