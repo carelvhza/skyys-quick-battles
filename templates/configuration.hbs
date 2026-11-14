@@ -13,10 +13,11 @@
               {{#each users}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
             </select>
           </label>
-          <label class="qb-field">
-            <span>Main character</span>
-            <select data-field="actorUuid">
-              <option value="">Select a character</option>
+          <label class="qb-field qb-actor-field">
+            <span>Player actor</span>
+            <input type="search" data-actor-search aria-label="Search actors" placeholder="Search actors" />
+            <select data-field="actorUuid" data-actor-selector>
+              <option value="">Select an actor</option>
               {{#each actors}}<option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
             </select>
           </label>
@@ -64,9 +65,10 @@
             <div class="qb-config-rows">
               {{#each roster}}
                 <div data-roster-row>
-                  <label class="qb-field">
+                  <label class="qb-field qb-actor-field">
                     <span>Actor</span>
-                    <select data-field="actorUuid">
+                    <input type="search" data-actor-search aria-label="Search encounter roster actors" placeholder="Search actors" />
+                    <select data-field="actorUuid" data-actor-selector>
                       <option value="">Use a custom name</option>
                       {{#each actors}}<option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
                     </select>

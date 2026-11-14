@@ -1,6 +1,7 @@
 import {
   averageRoundedDown,
   calculatePassiveBonuses,
+  d20ModifierParts,
   encounterBand,
   failureDamage,
   itemUses,
@@ -34,13 +35,17 @@ const DEFAULT_CONFIG = {
 };
 
 let mainApplication;
-let configurationApplication;
 let catalogPromise;
 let activeRunMessage;
 const inFlight = new Set();
 const damageInFlight = new Set();
 const participantApplications = new Map();
 let submissionQueue = Promise.resolve();
+
+function enqueueSubmission(operation) {
+  submissionQueue = submissionQueue.then(operation).catch(notifyError);
+  return submissionQueue;
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -78,12 +83,9 @@ function numberValue(value, label) {
 async function nativeD20(actor, modifier, flavor) {
   const rollClass = CONFIG.Dice.D20Roll;
   if (!rollClass?.build) throw new Error("D&D 5e's native D20 roll workflow is unavailable.");
-  const modifierPart = modifier === 0
-    ? "1d20"
-    : `1d20 ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}`;
   const rolls = await rollClass.build(
     {
-      rolls: [{ parts: [modifierPart], data: actor?.getRollData?.() ?? {}, options: {} }],
+      rolls: [{ parts: d20ModifierParts(modifier), data: actor?.getRollData?.() ?? {}, options: {} }],
       subject: actor ?? undefined,
       hookNames: ["D20Test"]
     },
@@ -376,9 +378,11 @@ async function rememberSelection(selection) {
 function statusLabel(run) {
   if (!run) return "";
   if (run.status === "fate-pending") return run.fate.pace === "stealth" ? "Waiting for group Stealth checks." : "Waiting for the selected player's d20.";
+  if (run.status === "fate-resolving") return "The Fate roll is complete; resolving the result.";
   if (run.status === "fate-resolved") return run.fateResult?.failed ? "Threat detected; choose an encounter group." : "No threat detected.";
   if (run.status === "checks-pending") return "Participant checks are in progress.";
   if (run.status === "checks-resolved") return "All participant checks are resolved.";
+  if (run.status === "cancelled") return "This Quick Battle was cancelled. Start a new Fate check when ready.";
   return run.status;
 }
 
@@ -388,10 +392,11 @@ function sortActors() {
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-function mainCharacterActors(user) {
+function playerActorOptions(user) {
+  if (user.isGM) return sortActors();
   return Array.from(game.actors)
     .filter((actor) => actor.type === "character")
-    .filter((actor) => user.isGM || actor.testUserPermission(user, "OWNER"))
+    .filter((actor) => actor.testUserPermission(user, "OWNER"))
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
@@ -573,12 +578,6 @@ async function openMainApplication() {
   await mainApplication.render({ force: true });
 }
 
-async function openConfiguration() {
-  if (!game.user.isGM) throw new Error("Only a GM can configure Quick Battles.");
-  configurationApplication ??= new QuickBattlesConfigurationApplication();
-  await configurationApplication.render({ force: true });
-}
-
 class QuickBattlesConfigurationApplication extends foundry.applications.api.HandlebarsApplicationMixin(
   foundry.applications.api.ApplicationV2
 ) {
@@ -595,7 +594,6 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
 
   constructor(options = {}) {
     super(options);
-    configurationApplication = this;
     this.configDraft = null;
   }
 
@@ -616,7 +614,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       ...config,
       players: config.players.map((player) => {
         const user = game.users.get(player.userId);
-        const ownedCharacters = user ? mainCharacterActors(user).map((actor) => ({
+        const ownedCharacters = user ? playerActorOptions(user).map((actor) => ({
           uuid: actor.uuid,
           name: actor.name
         })) : [];
@@ -674,25 +672,42 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         this._updateMainCharacterOptions(field.closest("[data-config-row]"), field.value);
       }
     });
+    this.element.addEventListener("input", (event) => {
+      const field = event.target;
+      if (field.matches("[data-actor-search]")) {
+        const select = field.closest(".qb-field").querySelector("[data-actor-selector]");
+        if (select) this._filterActorOptions(field, select);
+      }
+    });
+  }
+
+  _filterActorOptions(search, select) {
+    const query = search.value.trim().toLocaleLowerCase();
+    for (const option of select.options) {
+      option.hidden = Boolean(query && option.value && !option.textContent.toLocaleLowerCase().includes(query));
+    }
   }
 
   _updateMainCharacterOptions(row, userId) {
     const select = row.querySelector('[data-field="actorUuid"]');
+    const search = row.querySelector("[data-actor-search]");
     const currentUuid = select.value;
     const user = game.users.get(userId);
+    search.value = "";
     const placeholder = document.createElement("option");
     placeholder.value = "";
-    placeholder.textContent = "Select a character";
+    placeholder.textContent = "Select an actor";
     select.replaceChildren(placeholder);
     if (!user) return;
-    const characters = mainCharacterActors(user);
-    for (const actor of characters) {
+    const actors = playerActorOptions(user);
+    for (const actor of actors) {
       const option = document.createElement("option");
       option.value = actor.uuid;
       option.textContent = actor.name;
       select.append(option);
     }
-    if (characters.some((actor) => actor.uuid === currentUuid)) select.value = currentUuid;
+    if (actors.some((actor) => actor.uuid === currentUuid)) select.value = currentUuid;
+    this._filterActorOptions(search, select);
   }
 
   async _handleConfigurationAction(button) {
@@ -702,7 +717,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       this.configDraft = await writeConfig(readConfigurationForm(this.element));
       ui.notifications.info("Quick Battles configuration saved.");
       mainApplication?.render();
-      return this.render();
+      return this.close();
     }
     if (action === "remove-row") {
       button.closest("[data-config-row], [data-roster-row]")?.remove();
@@ -806,6 +821,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       rolls,
       canChooseEncounter: run?.status === "fate-resolved" && run.fateResult?.failed === true,
       canStartChecks: run?.status === "encounter-selected",
+      canCancelRun: run?.status !== "cancelled",
       state: run ? { ...run, statusLabel: statusLabel(run) } : null
     };
   }
@@ -865,10 +881,10 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
   async _handleAppAction(action) {
     if (action === "submit-check") return this._submitParticipantCheck();
     if (!game.user.isGM) throw new Error("Only a GM can control the Quick Battles flow.");
-    if (action === "start-fate") return this._startFate();
-    if (action === "choose-encounter") return this._chooseEncounter();
-    if (action === "start-checks") return this._startChecks();
-    if (action === "open-config") return openConfiguration();
+    if (action === "start-fate") return enqueueSubmission(() => this._startFate());
+    if (action === "choose-encounter") return enqueueSubmission(() => this._chooseEncounter());
+    if (action === "start-checks") return enqueueSubmission(() => this._startChecks());
+    if (action === "cancel-run") return enqueueSubmission(() => this._cancelRun());
   }
 
   async _startFate() {
@@ -877,6 +893,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     const active = await currentRun();
     if (active && (
       active.run.status === "fate-pending"
+      || active.run.status === "fate-resolving"
       || active.run.status === "checks-pending"
       || active.run.status === "encounter-selected"
       || (active.run.status === "fate-resolved" && active.run.fateResult?.failed)
@@ -887,8 +904,8 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       const user = game.users.get(entry.userId);
       if (!user) throw new Error(`Configured player ${entry.userId} was not found.`);
       const actor = await actorByUuid(entry.actorUuid);
-      if (actor.type !== "character") {
-        throw new Error(`${actor.name} must be a character to serve as a main character.`);
+      if (!user.isGM && actor.type !== "character") {
+        throw new Error(`${actor.name} must be a character to serve as a player's main character.`);
       }
       if (!user.isGM && !actor.testUserPermission(user, "OWNER")) {
         throw new Error(`${user.name} must own the configured main character ${actor.name}.`);
@@ -941,6 +958,23 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
           });
         }
       }
+    }
+    await this.render();
+  }
+
+  async _cancelRun() {
+    const current = await currentRun();
+    if (!current || current.run.status === "cancelled") return;
+    current.run.status = "cancelled";
+    await persistRun(current.run, current.message);
+    const pendingTypes = new Set(["fate-request", "stealth-request", "check-prompt"]);
+    for (const message of Array.from(game.messages)) {
+      const flag = message.flags?.[MODULE_ID];
+      if (flag?.runId !== current.run.id || !pendingTypes.has(flag.type) || flag.status !== "pending") continue;
+      await message.update({
+        content: chatCard("<h3>Quick Battles · Cancelled</h3><p>This Quick Battle was cancelled by the GM.</p>"),
+        [`flags.${MODULE_ID}.status`]: "cancelled"
+      });
     }
     await this.render();
   }
@@ -1321,7 +1355,8 @@ function handleIncomingPrompt(message) {
 }
 
 async function processChatSubmission(message) {
-  if (!game.user.isGM) return;
+  const activeGM = game.users.activeGM;
+  if (!game.user.isGM || (activeGM && activeGM.id !== game.user.id)) return;
   const data = message.flags?.[MODULE_ID];
   if (!data) return;
   try {
@@ -1346,10 +1381,18 @@ async function processFateSubmission(message, data) {
     throw new Error("The Fate roll author does not match the selected player.");
   }
   const current = await currentRun(data.runId);
-  if (!current || current.run.status !== "fate-pending" || current.run.fate.pace === "stealth") return;
+  if (!current || current.run.fate.pace === "stealth") return;
   if (current.run.fate.requestId !== data.requestId) return;
   if (!submitter?.isGM && current.run.fate.selectedUserId !== userId) return;
-  current.run.fate.d20 = submittedRoll(message);
+  if (current.run.status === "fate-pending") {
+    current.run.fate.d20 = submittedRoll(message);
+    current.run.fate.submissionId = message.id;
+    current.run.status = "fate-resolving";
+    await persistRun(current.run, current.message);
+  } else if (
+    current.run.status !== "fate-resolving"
+    || current.run.fate.submissionId !== message.id
+  ) return;
   await finishFate(current.run, current.message);
 }
 
@@ -1361,15 +1404,25 @@ async function processStealthSubmission(message, data) {
     throw new Error(`The submitter does not own ${actor.name}.`);
   }
   const current = await currentRun(data.runId);
-  if (!current || current.run.status !== "fate-pending" || current.run.fate.pace !== "stealth") return;
+  if (!current || !["fate-pending", "fate-resolving"].includes(current.run.status)
+    || current.run.fate.pace !== "stealth") return;
   const request = current.run.fate.stealthRequests.find((entry) => entry.requestId === data.requestId);
-  if (!request || request.actorUuid !== data.actorUuid || request.total != null) return;
+  if (!request || request.actorUuid !== data.actorUuid) return;
   if (!submitter.isGM && request.userId !== userId) throw new Error("The Stealth request belongs to another player.");
-  request.total = submittedRoll(message);
-  request.userId = userId;
-  const prompt = game.messages.get(request.promptId);
-  if (prompt) await prompt.delete();
+  const isRecovery = current.run.status === "fate-resolving"
+    && current.run.fate.submissionId === message.id
+    && request.total != null;
+  if (request.total != null && !isRecovery) return;
+  if (!isRecovery) {
+    request.total = submittedRoll(message);
+    request.userId = userId;
+    const prompt = game.messages.get(request.promptId);
+    if (prompt) await prompt.delete();
+  }
   if (current.run.fate.stealthRequests.every((entry) => entry.total != null)) {
+    current.run.status = "fate-resolving";
+    current.run.fate.submissionId = message.id;
+    await persistRun(current.run, current.message);
     await finishFate(current.run, current.message);
   } else {
     await persistRun(current.run, current.message);
@@ -1395,7 +1448,10 @@ async function finishFate(run, message) {
     if (run.fate.situation === "camp") watchShift = (await new Roll("1d2").evaluate()).total;
   }
 
-  run.fateResult = {
+  const current = await currentRun(run.id);
+  if (!current || current.run.status !== "fate-resolving"
+    || current.run.fate.submissionId !== run.fate.submissionId) return;
+  current.run.fateResult = {
     baseRoll,
     paceModifier,
     situational: run.fate.situational,
@@ -1407,20 +1463,20 @@ async function finishFate(run, message) {
     threatType,
     watchShift
   };
-  run.status = "fate-resolved";
-  await persistRun(run, message);
-  if (run.fate.promptId) {
-    const prompt = game.messages.get(run.fate.promptId);
+  current.run.status = "fate-resolved";
+  await persistRun(current.run, current.message ?? message);
+  if (current.run.fate.promptId) {
+    const prompt = game.messages.get(current.run.fate.promptId);
     if (prompt) {
       await prompt.update({
-        content: chatCard(`<h3>Quick Battles · Fate check resolved</h3><p>${run.fateResult.label}: ${total} vs DC ${run.fate.dc}.</p>`),
+        content: chatCard(`<h3>Quick Battles · Fate check resolved</h3><p>${current.run.fateResult.label}: ${total} vs DC ${current.run.fate.dc}.</p>`),
         [`flags.${MODULE_ID}.status`]: "resolved"
       });
     }
   }
   if (config.postGmResults) {
     await ChatMessage.create({
-      content: chatCard(`<h3>Fate result</h3><p>${run.fateResult.label}: ${total} vs DC ${run.fate.dc}.</p>${displayRollResult(run)}`),
+      content: chatCard(`<h3>Fate result</h3><p>${current.run.fateResult.label}: ${total} vs DC ${current.run.fate.dc}.</p>${displayRollResult(current.run)}`),
       whisper: gmUserIds()
     });
   }
@@ -1437,7 +1493,12 @@ async function processParticipantSubmission(message, data) {
   const current = await currentRun(data.runId);
   if (!current || current.run.status !== "checks-pending") return;
   const check = current.run.checks[data.actorUuid];
-  if (!check || check.checkId !== data.checkId || check.status !== "pending") return;
+  if (!check || check.checkId !== data.checkId) return;
+  if (check.status === "pending") {
+    check.status = "processing";
+    check.submissionId = message.id;
+    await persistRun(current.run, current.message);
+  } else if (check.status !== "processing" || check.submissionId !== message.id) return;
   const total = submittedRoll(message);
   const details = data.details;
   const passed = total >= Number(current.run.selectedEncounter.dc);
@@ -1465,7 +1526,7 @@ async function processParticipantSubmission(message, data) {
 
   const prompt = game.messages.get(check.promptId);
   if (prompt) await prompt.delete();
-  const allResolved = Object.values(current.run.checks).every((entry) => entry.status !== "pending");
+  const allResolved = Object.values(current.run.checks).every((entry) => ["passed", "failed"].includes(entry.status));
   if (allResolved) current.run.status = "checks-resolved";
   await persistRun(current.run, current.message);
   if (!passed && damage.damage > 0) await createDamageControl(current.run, actor, message, details);
@@ -1474,6 +1535,7 @@ async function processParticipantSubmission(message, data) {
 
 async function createDamageControl(run, actor, resultMessage, details) {
   const operationId = `${run.id}:${actor.uuid}:${details.checkId}`;
+  if (findMessageByFlag("damage-control", "operationId", operationId)) return;
   const button = createButton("Apply damage once", "apply-damage", `data-operation-id="${escapeHtml(operationId)}"`);
   await ChatMessage.create({
     content: chatCard(`<h3>GM damage control · ${escapeHtml(actor.name)}</h3><p>Apply ${details.damage} damage (${details.damagePercent}% of max HP) for failure by ${details.margin}.</p>${button}`),
@@ -1565,12 +1627,12 @@ Hooks.once("ready", () => {
   loadCatalog().catch(notifyError);
   Hooks.on("createChatMessage", (message) => handleIncomingPrompt(message));
   Hooks.on("createChatMessage", (message) => {
-    submissionQueue = submissionQueue.then(() => processChatSubmission(message));
+    enqueueSubmission(() => processChatSubmission(message));
   });
   if (game.user.isGM) {
     for (const message of Array.from(game.messages)) {
       if (["fate-submission", "stealth-submission", "participant-submission"].includes(message.flags?.[MODULE_ID]?.type)) {
-        submissionQueue = submissionQueue.then(() => processChatSubmission(message));
+        enqueueSubmission(() => processChatSubmission(message));
       }
     }
   }

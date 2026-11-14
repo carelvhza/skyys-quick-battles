@@ -67,13 +67,9 @@
       <button class="qb-primary" type="button" data-app-action="submit-check">Roll and submit vs DC {{dc}}</button>
     </form>
   {{else}}
-    <div class="qb-toolbar">
-      <button class="qb-secondary qb-config-button" type="button" data-app-action="open-config" aria-label="Configure Quick Battles" title="Configure Quick Battles">
-        <i class="fas fa-sliders" aria-hidden="true"></i> Configure
-      </button>
-    </div>
-    <div class="qb-section">
+    <div class="qb-section qb-fate-section">
       <h2>Fate check</h2>
+      <p class="qb-muted">A single d20 determines whether a threat finds the party. Apply pace, camp, and situational modifiers below.</p>
       <form class="qb-fate-form">
         <label class="qb-field">
           <span>Situation</span>
@@ -112,7 +108,7 @@
         <h2>Current run</h2>
         <p class="qb-muted">{{state.statusLabel}}</p>
         {{#if state.fateResult}}
-          <div class="qb-result">
+          <div class="qb-result qb-fate-result">
             <strong>{{state.fateResult.label}}</strong>
             <span>{{state.fateResult.total}} vs DC {{state.fate.dc}}</span>
             <span>Base roll {{state.fateResult.baseRoll}} · pace {{signed state.fateResult.paceModifier}} · situation {{signed state.fateResult.situational}} · camp {{signed state.fateResult.campModifier}}</span>
@@ -127,6 +123,9 @@
             <div>{{label}}: {{#if pending}}Pending{{else}}{{total}}{{/if}}</div>
           {{/each}}
         </div>
+        {{#if canCancelRun}}
+          <button class="qb-secondary qb-cancel-run" type="button" data-app-action="cancel-run">Cancel current run</button>
+        {{/if}}
       </div>
     {{/if}}
 
