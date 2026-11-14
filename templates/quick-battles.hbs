@@ -1,0 +1,184 @@
+<section class="qb-shell">
+  {{#if isParticipant}}
+    <form class="qb-check-form">
+      <header class="qb-actor-header">
+        <img src="{{actor.img}}" alt="" />
+        <div>
+          <h2>{{actor.name}}</h2>
+          <p>{{actor.classLine}} · HP {{actor.hp}} · AC {{actor.ac}}</p>
+        </div>
+      </header>
+
+      <div class="qb-panel">
+        <h3>Passive bonuses</h3>
+        <dl class="qb-bonus-list">
+          <div><dt>Highest ability ({{passive.abilityName}})</dt><dd>{{signed passive.ability}}</dd></div>
+          <div><dt>Charisma</dt><dd>{{signed passive.charisma}}</dd></div>
+          <div><dt>Current HP</dt><dd>{{signed passive.hp}}</dd></div>
+          <div><dt>Armor class</dt><dd>{{signed passive.armor}}</dd></div>
+          {{#each passiveEntries}}
+            <div><dt>{{name}}</dt><dd>{{signed bonus}}</dd></div>
+          {{/each}}
+          <div class="qb-total"><dt>Total passive</dt><dd>{{signed passive.total}}</dd></div>
+        </dl>
+      </div>
+
+      <label class="qb-field">
+        <span>Situational modifier</span>
+        <input name="situational" type="number" value="{{situational}}" min="-30" max="30" />
+      </label>
+
+      <div class="qb-panel">
+        <h3>Active features</h3>
+        {{#if activeItems.length}}
+          <div class="qb-resource-list">
+            {{#each activeItems}}
+              <label class="qb-resource-row">
+                <span>{{name}} <small>+{{bonusPerUse}} each · {{available}} available</small></span>
+                <input name="active-{{itemId}}" type="number" min="0" max="{{available}}" value="0" />
+              </label>
+            {{/each}}
+          </div>
+        {{else}}
+          <p class="qb-muted">No catalogued active feature uses are available.</p>
+        {{/if}}
+      </div>
+
+      <div class="qb-panel">
+        <h3>Spell slots</h3>
+        <div class="qb-resource-list">
+          {{#each spellSlots}}
+            <label class="qb-resource-row">
+              <span>Level {{level}} <small>+{{bonus}} each · {{available}} available</small></span>
+              <input name="slot-{{level}}" type="number" min="0" max="{{available}}" value="0" {{#unless available}}disabled{{/unless}} />
+            </label>
+          {{/each}}
+        </div>
+        <details class="qb-spells">
+          <summary>Known spells ({{spells.length}})</summary>
+          {{#each spells}}
+            <div>Level {{level}} · {{name}}</div>
+          {{else}}
+            <div class="qb-muted">No spells on this actor.</div>
+          {{/each}}
+        </details>
+      </div>
+
+      <button class="qb-primary" type="button" data-app-action="submit-check">Roll and submit vs DC {{dc}}</button>
+    </form>
+  {{else}}
+    <div class="qb-section">
+      <h2>Fate check</h2>
+      <form class="qb-fate-form">
+        <label class="qb-field">
+          <span>Situation</span>
+          <select name="situation">
+            <option value="travel">Traveling</option>
+            <option value="camp">Camping</option>
+          </select>
+        </label>
+        <label class="qb-field">
+          <span>Area difficulty</span>
+          <select name="area">
+            <option value="easy">Easy · DC {{config.fateDcs.easy}}</option>
+            <option value="medium" selected>Medium · DC {{config.fateDcs.medium}}</option>
+            <option value="hard">Hard · DC {{config.fateDcs.hard}}</option>
+          </select>
+        </label>
+        <label class="qb-field">
+          <span>Travel pace</span>
+          <select name="pace">
+            <option value="fast">Fast · {{signed config.paceModifiers.fast}}</option>
+            <option value="normal" selected>Regular · {{signed config.paceModifiers.normal}}</option>
+            <option value="slow">Slow · {{signed config.paceModifiers.slow}}</option>
+            <option value="stealth">Stealth group check</option>
+          </select>
+        </label>
+        <label class="qb-field">
+          <span>Situational modifier</span>
+          <input name="situational" type="number" value="0" min="-30" max="30" />
+        </label>
+        <button class="qb-primary" type="button" data-app-action="start-fate">Start Fate check</button>
+      </form>
+    </div>
+
+    {{#if state}}
+      <div class="qb-section">
+        <h2>Current run</h2>
+        <p class="qb-muted">{{state.statusLabel}}</p>
+        {{#if state.fateResult}}
+          <div class="qb-result">
+            <strong>{{state.fateResult.label}}</strong>
+            <span>{{state.fateResult.total}} vs DC {{state.fate.dc}}</span>
+            <span>Base roll {{state.fateResult.baseRoll}} · pace {{signed state.fateResult.paceModifier}} · situation {{signed state.fateResult.situational}} · camp {{signed state.fateResult.campModifier}}</span>
+            {{#if state.fateResult.failed}}
+              <span>{{state.fateResult.difficulty.label}} · DC {{state.fateResult.difficulty.dc}}</span>
+              {{#if state.fateResult.watchShift}}<span>Watch shift {{state.fateResult.watchShift}}</span>{{/if}}
+            {{/if}}
+          </div>
+        {{/if}}
+        <div class="qb-rolls">
+          {{#each state.rolls}}
+            <div>{{label}}: {{#if pending}}Pending{{else}}{{total}}{{/if}}</div>
+          {{/each}}
+        </div>
+      </div>
+    {{/if}}
+
+    {{#if groups.length}}
+      <div class="qb-section">
+        <h2>Encounter</h2>
+        <label class="qb-field">
+          <span>Encounter group / area</span>
+          <select name="encounter-group">
+            {{#each groups}}<option value="{{id}}">{{name}}</option>{{/each}}
+          </select>
+        </label>
+        <button class="qb-secondary" type="button" data-app-action="choose-encounter" {{#unless canChooseEncounter}}disabled{{/unless}}>Choose random encounter</button>
+        {{#if state.selectedEncounter}}
+          <div class="qb-result">
+            <strong>{{state.selectedEncounter.name}}</strong>
+            <span>{{state.selectedEncounter.description}}</span>
+            <span>{{state.selectedEncounter.difficultyLabel}} · DC {{state.selectedEncounter.dc}}</span>
+            <details class="qb-gm-only">
+              <summary>GM roster guidance</summary>
+              {{#each state.selectedEncounter.roster}}
+                <div>{{name}} × {{count}}</div>
+              {{else}}
+                <div>No roster configured.</div>
+              {{/each}}
+            </details>
+          </div>
+
+          <h3>Participants</h3>
+          <div class="qb-participants">
+            {{#each actors}}
+              <label class="qb-participant-row">
+                <span><input type="checkbox" class="qb-participant" value="{{uuid}}" {{#if defaultSelected}}checked{{/if}} /> {{name}}</span>
+                <input class="qb-situational" data-actor-uuid="{{uuid}}" type="number" value="0" aria-label="Situational modifier for {{name}}" />
+                {{#if checkStatus}}<small>{{checkStatus}}</small>{{/if}}
+              </label>
+            {{/each}}
+          </div>
+          <button class="qb-primary" type="button" data-app-action="start-checks" {{#unless canStartChecks}}disabled{{/unless}}>Prompt participant checks</button>
+        {{/if}}
+      </div>
+    {{else}}
+      <div class="qb-section">
+        <h2>Encounter data required</h2>
+        <p class="qb-muted">Add encounter groups and entries in the configuration editor below.</p>
+      </div>
+    {{/if}}
+
+    <div class="qb-section">
+      <button class="qb-link" type="button" data-app-action="toggle-config">Edit configuration</button>
+      {{#if showConfig}}
+        <label class="qb-field">
+          <span>GM-only JSON configuration</span>
+          <textarea class="qb-config" rows="18" spellcheck="false">{{configJson}}</textarea>
+        </label>
+        <button class="qb-secondary" type="button" data-app-action="save-config">Validate and save</button>
+      {{/if}}
+    </div>
+  {{/if}}
+</section>
