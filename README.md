@@ -8,11 +8,11 @@ Enable the module, then open the Quick Battles window as a GM with `/quickbattle
 
 ## Configure players and encounters
 
-In Foundry, open **Game Settings → Configure Settings → Module Settings → Quick Battles configuration → Configure**. The GM-only configuration form lets you manage player-to-character mappings, encounter groups and entries, GM roster guidance, Fate DCs, travel and spell-slot modifiers, encounter difficulty bands, damage behavior, and feature catalog changes. You can also open the same form from the compact button in the Quick Battles window. Configuration is shared across GM profiles in the world. The main-character selector only lists characters owned by the selected player; GMs may select any character. Player cards receive only the check data they need.
+In Foundry, open **Game Settings → Configure Settings → Module Settings → Quick Battles configuration → Configure**. The GM-only configuration form lets you manage player-to-actor mappings, encounter groups and entries, GM roster guidance, Fate DCs, travel and spell-slot modifiers, encounter difficulty bands, damage behavior, and feature catalog changes. Configuration is shared across GM profiles in the world. A GM mapping may use any character or NPC; a player mapping lists only characters owned by that player. Actor selectors in both player mappings and encounter rosters include a name search. Player cards receive only the check data they need.
 
-The Quick Battles window remembers the last Fate area and encounter group selected on that client. Active run state is stored in the world settings for recovery without an extra GM-only run chat card.
+The Quick Battles window remembers the last Fate area and encounter group selected on that client. Active run state is stored in the world settings for recovery without an extra GM-only run chat card. A GM can cancel a pending or selected run from the window and start a fresh Fate check.
 
-Use Foundry's user and actor selectors to map each player to a main character. Encounters can belong to multiple groups and can include optional DC/label overrides plus GM-only roster guidance; roster counts do not modify encounter difficulty. Difficulty bands must cover d20 results 1–20 contiguously. The feature catalog form can change a feature's type or bonus, disable a default entry by name, or add a custom feature; Low/Medium/High ratings map to +1/+2/+3.
+Use Foundry's user and searchable actor selectors to map each player to an actor. Encounters can belong to multiple groups and can include optional DC/label overrides plus GM-only roster guidance; roster counts do not modify encounter difficulty. Difficulty bands must cover d20 results 1–20 contiguously. The feature catalog form can change a feature's type or bonus, disable a default entry by name, or add a custom feature; Low/Medium/High ratings map to +1/+2/+3.
 
 ## Defaults
 

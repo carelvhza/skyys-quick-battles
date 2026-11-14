@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   averageRoundedDown,
   calculatePassiveBonuses,
+  d20ModifierParts,
   encounterBand,
   failureDamage,
   itemUses,
@@ -38,17 +39,17 @@ test("configuration is available through a structured Foundry settings menu", ()
   assert.match(configurationTemplate, /data-field="fateDcEasy"/);
   assert.match(configurationTemplate, /data-config-collection="catalogOverrides"/);
   assert.match(applicationSource, /actor\.testUserPermission\(user, "OWNER"\)/);
-  assert.match(applicationSource, /if \(actor\.type !== "character"\)/);
+  assert.match(applicationSource, /if \(!user\.isGM && actor\.type !== "character"\)/);
   assert.match(configurationTemplate, /data-field="id" type="hidden"/);
   assert.doesNotMatch(configurationTemplate, /<span>Group ID<\/span>/);
   assert.doesNotMatch(mainTemplate, /class="qb-config"/);
 });
 
-test("Quick Battles remembers selections and keeps the main configuration control compact", () => {
+test("Quick Battles remembers selections without duplicate main-window configuration", () => {
   assert.match(applicationSource, /scope: "client"[\s\S]*?type: Object/);
   assert.match(applicationSource, /rememberSelection\(\{ area \}\)/);
   assert.match(applicationSource, /rememberSelection\(\{ encounterGroupId: groupId \}\)/);
-  assert.match(mainTemplate, /class="qb-toolbar"/);
+  assert.doesNotMatch(mainTemplate, /class="qb-toolbar"/);
   assert.doesNotMatch(mainTemplate, /<h2>Configuration<\/h2>/);
   assert.match(mainTemplate, /name="area"[\s\S]*?{{#if selected}}selected{{\/if}}/);
   assert.match(mainTemplate, /name="encounter-group"[\s\S]*?{{#if selected}}selected{{\/if}}/);
@@ -61,7 +62,29 @@ test("run recovery is persisted without creating a GM-only run chat card", () =>
 });
 
 test("native D20 roll configurations initialize the D&D 5e roll options", () => {
-  assert.match(applicationSource, /rolls: \[\{ parts: \[modifierPart\],[\s\S]*?options: \{\}/);
+  assert.match(applicationSource, /rolls: \[\{ parts: d20ModifierParts\(modifier\),[\s\S]*?options: \{\}/);
+  assert.deepEqual(d20ModifierParts(0), []);
+  assert.deepEqual(d20ModifierParts(3), ["3"]);
+  assert.deepEqual(d20ModifierParts(-2), ["-2"]);
+});
+
+test("configuration supports GM-owned NPC mappings, searchable actors, and closes after saving", () => {
+  assert.match(applicationSource, /function playerActorOptions\(user\) \{\s*if \(user\.isGM\) return sortActors\(\)/);
+  assert.match(applicationSource, /if \(!user\.isGM && actor\.type !== "character"\)/);
+  assert.equal((configurationTemplate.match(/data-actor-search/g) ?? []).length, 2);
+  assert.equal((configurationTemplate.match(/data-actor-selector/g) ?? []).length, 2);
+  assert.match(applicationSource, /return this\.close\(\)/);
+  assert.doesNotMatch(mainTemplate, /data-app-action="open-config"/);
+});
+
+test("runs can be cancelled and native roll submissions recover from processing state", () => {
+  assert.match(mainTemplate, /data-app-action="cancel-run"/);
+  assert.match(applicationSource, /current\.run\.status = "cancelled"/);
+  assert.match(applicationSource, /current\.run\.status = "fate-resolving"/);
+  assert.match(applicationSource, /current\.run\.fate\.submissionId !== message\.id/);
+  assert.match(applicationSource, /check\.status = "processing"/);
+  assert.match(applicationSource, /game\.users\.activeGM/);
+  assert.match(applicationSource, /function enqueueSubmission\(operation\)/);
 });
 
 test("the supplied feat catalog is parsed in full, including comma-containing descriptions", () => {

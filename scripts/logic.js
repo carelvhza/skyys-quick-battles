@@ -140,6 +140,11 @@ export function averageRoundedDown(values) {
   return Math.floor(values.reduce((sum, value) => sum + finiteNumber(value), 0) / values.length);
 }
 
+export function d20ModifierParts(modifier) {
+  const value = finiteNumber(modifier, 0);
+  return value === 0 ? [] : [String(value)];
+}
+
 export function spellSlotBonus(spends, bonusesByLevel = {}) {
   return Object.entries(spends).reduce((total, [level, count]) => {
     return total + Math.max(0, Math.floor(finiteNumber(count))) * finiteNumber(bonusesByLevel[level], 0);
