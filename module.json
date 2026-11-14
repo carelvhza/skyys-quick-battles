@@ -1,0 +1,28 @@
+{
+  "id": "skyys-quick-battles",
+  "title": "Skyy's Quick Battles",
+  "description": "A lightweight, Foundry-native workflow for travel threats, encounter selection, and resource-powered checks.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "6.0.0",
+          "verified": "6.0.0"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/quick-battles.js"
+  ],
+  "styles": [
+    "styles/quick-battles.css"
+  ]
+}
