@@ -1406,7 +1406,7 @@ async function processFateSubmission(message, data) {
 }
 
 async function processStealthSubmission(message, data) {
-  const userId = message.user?.id ?? message.user;
+  const userId = message.author?._id ?? message.author?._id;
   const actor = await actorByUuid(data.actorUuid);
   const submitter = game.users.get(userId);
   if (!submitter || (!submitter.isGM && !actor.testUserPermission(submitter, "OWNER"))) {
