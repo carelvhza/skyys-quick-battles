@@ -786,12 +786,16 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     const configuredActorIds = new Set(config.players.map((entry) => entry.actorUuid));
     const selectedIds = new Set(run?.participantIds ?? configuredActorIds);
     const checkedStatuses = run?.checks ?? {};
-    const actors = sortActors().map((actor) => ({
-      uuid: actor.uuid,
-      name: actor.name,
-      defaultSelected: selectedIds.has(actor.uuid),
-      checkStatus: checkedStatuses[actor.uuid]?.statusLabel ?? ""
+    const actors = await Promise.all(config.players.map(async (entry) => {
+      const actor = await actorByUuid(entry.actorUuid);
+      return {
+        uuid: entry.actorUuid,
+        name: actor.name,
+        defaultSelected: selectedIds.has(entry.actorUuid),
+        checkStatus: checkedStatuses[entry.actorUuid]?.statusLabel ?? ""
+      };
     }));
+    actors.sort((left, right) => left.name.localeCompare(right.name));
     const rolls = run
       ? run.fate.pace === "stealth"
         ? run.fate.stealthRequests.map((request) => ({
@@ -1037,9 +1041,13 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     if (!current?.run?.selectedEncounter || current.run.status !== "encounter-selected") {
       throw new Error("Choose an encounter before prompting checks.");
     }
-    const selectedUuids = Array.from(this.element.querySelectorAll(".qb-participant:checked"))
-      .map((input) => input.value);
+    const configuredActorUuids = new Set(config.players.map((entry) => entry.actorUuid));
+    const selectedUuids = [...new Set(Array.from(this.element.querySelectorAll(".qb-participant:checked"))
+      .map((input) => input.value))];
     if (selectedUuids.length === 0) throw new Error("Select at least one participant.");
+    if (selectedUuids.some((actorUuid) => !configuredActorUuids.has(actorUuid))) {
+      throw new Error("Only configured players' main characters can participate.");
+    }
     const catalog = await effectiveCatalog(config);
     current.run.participantIds = selectedUuids;
     current.run.status = "checks-pending";
@@ -1374,10 +1382,12 @@ function submittedRoll(message) {
 }
 
 async function processFateSubmission(message, data) {
-  const userId = message.user?.id ?? message.user;
+  const userId = message.author?._id ?? message.author?._id;
   const submitter = game.users.get(userId);
   if (!submitter || userId !== data.userId) {
-    throw new Error("The Fate roll author does not match the selected player.");
+    if (!submitter?.isGM) {
+      throw new Error("The Fate roll author does not match the selected player.");
+    }
   }
   const current = await currentRun(data.runId);
   if (!current || current.run.fate.pace === "stealth") return;
@@ -1626,6 +1636,7 @@ Hooks.once("ready", () => {
   loadCatalog().catch(notifyError);
   Hooks.on("createChatMessage", (message) => handleIncomingPrompt(message));
   Hooks.on("createChatMessage", (message) => {
+    console.log('[skyy] hooked');
     enqueueSubmission(() => processChatSubmission(message));
   });
   if (game.user.isGM) {
