@@ -67,6 +67,11 @@
       <button class="qb-primary" type="button" data-app-action="submit-check">Roll and submit vs DC {{dc}}</button>
     </form>
   {{else}}
+    <div class="qb-toolbar">
+      <button class="qb-secondary qb-config-button" type="button" data-app-action="open-config" aria-label="Configure Quick Battles" title="Configure Quick Battles">
+        <i class="fas fa-sliders" aria-hidden="true"></i> Configure
+      </button>
+    </div>
     <div class="qb-section">
       <h2>Fate check</h2>
       <form class="qb-fate-form">
@@ -80,9 +85,9 @@
         <label class="qb-field">
           <span>Area difficulty</span>
           <select name="area">
-            <option value="easy">Easy · DC {{config.fateDcs.easy}}</option>
-            <option value="medium" selected>Medium · DC {{config.fateDcs.medium}}</option>
-            <option value="hard">Hard · DC {{config.fateDcs.hard}}</option>
+            {{#each fateAreas}}
+              <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}} · DC {{dc}}</option>
+            {{/each}}
           </select>
         </label>
         <label class="qb-field">
@@ -131,7 +136,7 @@
         <label class="qb-field">
           <span>Encounter group / area</span>
           <select name="encounter-group">
-            {{#each groups}}<option value="{{id}}">{{name}}</option>{{/each}}
+            {{#each groups}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
           </select>
         </label>
         <button class="qb-secondary" type="button" data-app-action="choose-encounter" {{#unless canChooseEncounter}}disabled{{/unless}}>Choose random encounter</button>
@@ -170,10 +175,5 @@
       </div>
     {{/if}}
 
-    <div class="qb-section">
-      <h2>Configuration</h2>
-      <p class="qb-muted">Manage players, encounters, and rules with the structured settings form.</p>
-      <button class="qb-secondary" type="button" data-app-action="open-config">Open configuration settings</button>
-    </div>
   {{/if}}
 </section>

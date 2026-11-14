@@ -2,7 +2,7 @@
   "id": "skyys-quick-battles",
   "title": "Skyy's Quick Battles",
   "description": "A lightweight, Foundry-native workflow for travel threats, encounter selection, and resource-powered checks.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "compatibility": {
     "minimum": "14",
     "verified": "14"
