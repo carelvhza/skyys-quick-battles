@@ -614,7 +614,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
   static DEFAULT_OPTIONS = {
     id: `${MODULE_ID}-configuration`,
     classes: ["quick-battles-app", "quick-battles-config"],
-    position: { width: 720, height: "auto" },
+    position: { width: "60vw", height: "auto" },
     window: { title: "Quick Battles Configuration", resizable: true }
   };
 

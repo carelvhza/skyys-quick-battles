@@ -15,7 +15,6 @@
 }
 
 .quick-battles-config {
-  width: 70vw !important;
   min-width: min(90vw, 24rem);
   max-width: calc(100vw - 1rem);
 }
@@ -285,8 +284,6 @@
 }
 
 .qb-field {
-  display: grid;
-  grid-template-columns: minmax(9rem, 1fr) minmax(8rem, 1.4fr);
   gap: 0.5rem;
   align-items: center;
 }
@@ -296,6 +293,7 @@
 .qb-resource-row input,
 .qb-situational {
   min-width: 0;
+  height: auto;
 }
 
 .qb-config-rows {
@@ -317,6 +315,7 @@
 .qb-config-rows .qb-player-row {
   grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
   align-items: end;
+  gap: 0.5rem;
 }
 
 .qb-config-rows .qb-group-row {
@@ -376,12 +375,6 @@
   border-radius: 0.35rem;
   background: var(--color-cool-5);
   box-shadow: 0 0.3rem 0.8rem color-mix(in srgb, var(--color-cool-1) 28%, transparent);
-}
-
-.qb-actor-field select[size="10"],
-.qb-roster-config-row select[size="10"] {
-  max-height: 12rem;
-  overflow-y: auto;
 }
 
 .qb-config-dialog,
