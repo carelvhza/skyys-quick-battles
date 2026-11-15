@@ -97,7 +97,7 @@
   min-width: 0;
   gap: 0.7rem;
   padding: 0.9rem;
-  border: 1px solid var(--color-border-light-2);
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 0.6rem;
   background:
     linear-gradient(145deg, color-mix(in srgb, var(--color-cool-4) 45%, transparent), transparent 58%),
@@ -318,7 +318,7 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: 0.75rem;
   min-width: 0;
-  padding: 0.6rem;
+  padding: 0.2rem;
   border: 1px solid var(--color-border-light-2);
   border-radius: 0.3rem;
 }
@@ -331,16 +331,25 @@
 .qb-config-rows .qb-group-row {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
+  border: none !important;
+  margin: 0 !important;
+  gap: 12px !important;
 }
 
 .qb-config-rows .qb-encounter-config-row {
   grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) auto;
   align-items: end;
+  border: none !important;
+  margin: 0 !important;
+  gap: 12px !important;
 }
 
 .qb-config-rows .qb-difficulty-row {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
   align-items: end;
+  border: none !important;
+  margin: 0 !important;
+  gap: 12px !important;
 }
 
 .qb-config-actions {
