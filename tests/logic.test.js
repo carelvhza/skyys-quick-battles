@@ -16,6 +16,7 @@ import {
   mergeCatalog,
   parseFeatCatalog,
   resourceBonus,
+  reassignEncounterGroup,
   selectedCatalogBonuses,
   spellSlotBonus,
   submittedRollTotal
@@ -46,14 +47,39 @@ test("configuration is available through a structured Foundry settings menu", ()
   assert.match(configurationTemplate, /data-config-collection="encounters"/);
   assert.match(configurationTemplate, /data-field="fateDcEasy"/);
   assert.match(configurationTemplate, /data-config-collection="catalogOverrides"/);
-  assert.match(styleSource, /\.qb-configuration-form\s*\{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(styleSource, /@container quick-battles \(max-width: 40rem\)[\s\S]*\.qb-configuration-form/);
+  assert.match(styleSource, /\.quick-battles-config\s*\{\s*width: 70vw !important/);
+  assert.match(styleSource, /@media \(max-width: 40rem\)[\s\S]*\.quick-battles-config/);
   assert.match(configurationTemplate, /qb-config-intro/);
   assert.match(applicationSource, /actor\.testUserPermission\(user, "OWNER"\)/);
   assert.match(applicationSource, /if \(!user\.isGM && actor\.type !== "character"\)/);
   assert.match(configurationTemplate, /data-field="id" type="hidden"/);
   assert.doesNotMatch(configurationTemplate, /<span>Group ID<\/span>/);
   assert.doesNotMatch(mainTemplate, /class="qb-config"/);
+});
+
+test("configuration sections use the requested order and encounter details open in an accessible dialog", () => {
+  const sections = [
+    "Player characters",
+    "Encounter groups",
+    "Encounters",
+    "Encounter difficulty bands",
+    "Fate and travel",
+    "Spell slot bonuses",
+    "Results and damage",
+    "Feature catalog changes"
+  ];
+  const positions = sections.map((title) => configurationTemplate.indexOf(`<h2>${title}</h2>`));
+  assert.ok(positions.every((position) => position >= 0));
+  assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+  assert.match(configurationTemplate, /<dialog[^>]*data-encounter-dialog[^>]*aria-labelledby=/);
+  assert.match(configurationTemplate, /data-dialog-field="description"/);
+  assert.match(configurationTemplate, /data-dialog-field="difficultyLabel"/);
+  assert.match(configurationTemplate, /data-dialog-field="dc"/);
+  assert.match(configurationTemplate, /data-dialog-roster/);
+  assert.match(configurationTemplate, /data-group-summary/);
+  assert.match(configurationTemplate, /data-field="description" rows="2"/);
+  assert.match(applicationSource, /baseConfig\.catalogOverrides\[index\]/);
+  assert.match(applicationSource, /dialog\.showModal\(\)/);
 });
 
 test("Quick Battles remembers selections without duplicate main-window configuration", () => {
@@ -87,13 +113,36 @@ test("submitted chat rolls deserialize Foundry v14 roll data before reading tota
   assert.match(applicationSource, /submittedRollTotal\(message\.rolls\?\.\[0\], \(serialized\) => Roll\.fromJSON\(serialized\)\)/);
 });
 
-test("configuration supports GM-owned NPC mappings, searchable actors, and closes after saving", () => {
+test("configuration filters player actor options by ownership and scrolls long actor lists", () => {
   assert.match(applicationSource, /function playerActorOptions\(user\) \{\s*if \(user\.isGM\) return sortActors\(\)/);
+  assert.match(applicationSource, /\.sort\(\(left, right\) => left\.name\.localeCompare\(right\.name\)\)/);
   assert.match(applicationSource, /if \(!user\.isGM && actor\.type !== "character"\)/);
-  assert.equal((configurationTemplate.match(/data-actor-search/g) ?? []).length, 2);
-  assert.equal((configurationTemplate.match(/data-actor-selector/g) ?? []).length, 2);
+  assert.doesNotMatch(configurationTemplate, /data-actor-search/);
+  assert.equal((configurationTemplate.match(/data-actor-selector/g) ?? []).length, 1);
+  assert.match(applicationSource, /actorListSize: selectedActors\.length > 10 \? 10 : 1/);
+  assert.match(applicationSource, /select\.size = actors\.length > 10 \? 10 : 1/);
   assert.match(applicationSource, /return this\.close\(\)/);
   assert.doesNotMatch(mainTemplate, /data-app-action="open-config"/);
+});
+
+test("empty encounter group configuration receives Main and linked groups are reassigned without mutation", () => {
+  assert.match(applicationSource, /encounterGroups: \[\{ id: "main", name: "Main" \}\]/);
+  assert.match(applicationSource, /if \(config\.encounterGroups\.length === 0\) config\.encounterGroups = clone\(DEFAULT_CONFIG\.encounterGroups\)/);
+  const encounters = [
+    { id: "a", groups: ["remove", "keep"] },
+    { id: "b", groups: ["remove"] },
+    { id: "c", groups: ["keep"] }
+  ];
+  const reassigned = reassignEncounterGroup(encounters, "remove", "main");
+  assert.deepEqual(reassigned.map(({ id, groups }) => [id, groups]), [
+    ["a", ["main", "keep"]],
+    ["b", ["main"]],
+    ["c", ["keep"]]
+  ]);
+  assert.deepEqual(encounters[0].groups, ["remove", "keep"]);
+  assert.throws(() => reassignEncounterGroup(encounters, "remove", ""), /remaining encounter group/);
+  assert.match(applicationSource, /if \(draft\.encounterGroups\.length <= 1\)/);
+  assert.match(applicationSource, /if \(!confirmed\) return/);
 });
 
 test("runs can be cancelled and native roll submissions recover from processing state", () => {

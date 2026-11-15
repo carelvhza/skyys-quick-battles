@@ -12,6 +12,7 @@ import {
   itemUses,
   mergeCatalog,
   parseFeatCatalog,
+  reassignEncounterGroup,
   resourceBonus,
   selectedCatalogBonuses,
   spellSlotBonus,
@@ -24,7 +25,7 @@ const CONFIG_TEMPLATE = `modules/${MODULE_ID}/templates/configuration.hbs`;
 const DEFAULT_LAST_SELECTION = { area: "medium", encounterGroupId: "" };
 const DEFAULT_CONFIG = {
   players: [],
-  encounterGroups: [],
+  encounterGroups: [{ id: "main", name: "Main" }],
   encounters: [],
   catalogOverrides: [],
   fateDcs: { easy: 10, medium: 13, hard: 16 },
@@ -124,6 +125,7 @@ function normalizeConfig(candidate) {
   for (const key of ["players", "encounterGroups", "encounters", "catalogOverrides", "encounterDifficultyBands"]) {
     if (!Array.isArray(config[key])) throw new Error(`${key} must be an array.`);
   }
+  if (config.encounterGroups.length === 0) config.encounterGroups = clone(DEFAULT_CONFIG.encounterGroups);
   if (config.players.some((player) => !player?.userId || !player?.actorUuid)) {
     throw new Error("Each player entry needs a userId and actorUuid.");
   }
@@ -198,16 +200,12 @@ async function writeConfig(config) {
   return normalized;
 }
 
-function readConfigurationForm(element) {
+function readConfigurationForm(element, baseConfig = DEFAULT_CONFIG) {
   const field = (row, name) => row.querySelector(`[data-field="${name}"]`);
   const text = (row, name) => field(row, name)?.value.trim() ?? "";
   const number = (row, name) => Number(field(row, name)?.value);
-  const optionalNumber = (row, name) => {
-    const value = field(row, name)?.value;
-    return value == null || value.trim() === "" ? {} : { [name]: Number(value) };
-  };
   const rows = (collection) => Array.from(element.querySelectorAll(`[data-config-collection="${collection}"] [data-config-row]`));
-  const config = clone(DEFAULT_CONFIG);
+  const config = clone(baseConfig);
 
   config.players = rows("players").map((row) => ({
     userId: text(row, "userId"),
@@ -219,18 +217,12 @@ function readConfigurationForm(element) {
   }));
   config.encounters = rows("encounters").map((row) => {
     const id = text(row, "id");
+    const existing = baseConfig.encounters.find((encounter) => encounter.id === id) ?? {};
     return {
-      ...(id ? { id } : {}),
+      ...existing,
+      id,
       name: text(row, "name"),
-      description: text(row, "description"),
-      groups: Array.from(row.querySelectorAll('[data-field="groups"]:checked')).map((input) => input.value),
-      ...optionalNumber(row, "dc"),
-      difficultyLabel: text(row, "difficultyLabel"),
-      roster: Array.from(row.querySelectorAll("[data-roster-row]")).map((member) => ({
-        actorUuid: text(member, "actorUuid"),
-        name: text(member, "name"),
-        count: number(member, "count")
-      })).filter((member) => member.actorUuid || member.name)
+      groups: Array.from(row.querySelectorAll('[data-field="groups"]:checked')).map((input) => input.value)
     };
   });
   config.encounterDifficultyBands = rows("encounterDifficultyBands").map((row) => ({
@@ -240,14 +232,23 @@ function readConfigurationForm(element) {
     dc: number(row, "dc"),
     ...(field(row, "combat")?.checked ? { combat: true } : {})
   }));
-  config.catalogOverrides = rows("catalogOverrides").map((row) => ({
-    name: text(row, "name"),
-    type: text(row, "type"),
-    rating: text(row, "rating"),
-    disabled: field(row, "disabled")?.checked ?? false,
-    ...optionalNumber(row, "bonus"),
-    ...optionalNumber(row, "bonusPerUse")
-  }));
+  config.catalogOverrides = rows("catalogOverrides").map((row) => {
+    const index = Number(row.dataset.configIndex);
+    const override = { ...(baseConfig.catalogOverrides[index] ?? {}) };
+    override.name = text(row, "name");
+    override.type = text(row, "type");
+    override.rating = text(row, "rating");
+    override.disabled = field(row, "disabled")?.checked ?? false;
+    const description = text(row, "description");
+    if (description) override.description = description;
+    else delete override.description;
+    for (const name of ["bonus", "bonusPerUse"]) {
+      const value = field(row, name)?.value;
+      if (value == null || value.trim() === "") delete override[name];
+      else override[name] = Number(value);
+    }
+    return override;
+  });
   config.fateDcs = {
     easy: number(element, "fateDcEasy"),
     medium: number(element, "fateDcMedium"),
@@ -624,14 +625,20 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
   constructor(options = {}) {
     super(options);
     this.configDraft = null;
+    this.actorOptions = [];
+    this.users = [];
+    this.activeEncounterId = null;
   }
 
   async _prepareContext() {
     if (!game.user.isGM) throw new Error("Only a GM can configure Quick Battles.");
     const config = this.configDraft ?? await readConfig();
+    this.configDraft ??= clone(config);
     const users = Array.from(game.users)
       .map((user) => ({ id: user.id, name: user.name }));
     const actors = sortActors().map((actor) => ({ uuid: actor.uuid, name: actor.name }));
+    this.actorOptions = actors;
+    this.users = users;
     const withSelectedOption = (options, selected, valueKey) => {
       const prepared = options.map((option) => ({ ...option, selected: option[valueKey] === selected }));
       if (selected && !prepared.some((option) => option[valueKey] === selected)) {
@@ -647,10 +654,12 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
           uuid: actor.uuid,
           name: actor.name
         })) : [];
+        const selectedActors = withSelectedOption(ownedCharacters, player.actorUuid, "uuid");
         return {
           ...player,
           users: withSelectedOption(users, player.userId, "id"),
-          actors: withSelectedOption(ownedCharacters, player.actorUuid, "uuid")
+          actors: selectedActors,
+          actorListSize: selectedActors.length > 10 ? 10 : 1
         };
       }),
       encounters: config.encounters.map((encounter) => ({
@@ -659,6 +668,10 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
           ...group,
           selected: encounter.groups.includes(group.id)
         })),
+        selectedGroupSummary: config.encounterGroups
+          .filter((group) => encounter.groups.includes(group.id))
+          .map((group) => group.name)
+          .join(", ") || "Select encounter groups",
         roster: (encounter.roster ?? []).map((member) => ({
           ...member,
           actorUuid: member.actorUuid ?? game.actors.get(member.actorId)?.uuid ?? "",
@@ -682,7 +695,9 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         return { level, bonus: config.spellSlotBonuses[level] };
       })
     };
-    return { config: preparedConfig, users, actors };
+    const configuredUsers = new Set(config.players.map((player) => player.userId));
+    const availableUsers = users.filter((user) => !configuredUsers.has(user.id));
+    return { config: preparedConfig, users, actors, availableUsers };
   }
 
   async _onRender(context, options) {
@@ -697,63 +712,275 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     });
     this.element.addEventListener("change", (event) => {
       const field = event.target;
-      if (field.matches('[data-field="userId"]')) {
+      if (field.matches('[data-app-action="add-player"]')) {
+        this._handleConfigurationAction(field).catch(notifyError);
+      } else if (field.matches('[data-field="userId"]')) {
         this._updateMainCharacterOptions(field.closest("[data-config-row]"), field.value);
+        this._refreshAvailablePlayers();
+      } else if (field.matches('[data-field="groups"]')) {
+        this._updateGroupSummaries();
       }
     });
     this.element.addEventListener("input", (event) => {
       const field = event.target;
-      if (field.matches("[data-actor-search]")) {
-        const select = field.closest(".qb-field").querySelector("[data-actor-selector]");
-        if (select) this._filterActorOptions(field, select);
+      if (field.matches('[data-config-collection="encounterGroups"] [data-field="name"]')) {
+        this._updateGroupSummaries();
       }
     });
   }
 
-  _filterActorOptions(search, select) {
-    const query = search.value.trim().toLocaleLowerCase();
-    for (const option of select.options) {
-      option.hidden = Boolean(query && option.value && !option.textContent.toLocaleLowerCase().includes(query));
+  _updateGroupSummaries() {
+    const groups = new Map(Array.from(this.element.querySelectorAll(
+      '[data-config-collection="encounterGroups"] [data-config-row]'
+    )).map((row) => [
+      row.querySelector('[data-field="id"]').value,
+      row.querySelector('[data-field="name"]').value.trim()
+    ]));
+    for (const row of this.element.querySelectorAll('[data-config-collection="encounters"] [data-config-row]')) {
+      const selectedNames = [];
+      for (const option of row.querySelectorAll('[data-field="groups"]')) {
+        const name = groups.get(option.value) ?? "";
+        option.closest("label").querySelector("[data-group-name]").textContent = name;
+        if (option.checked && name) selectedNames.push(name);
+      }
+      row.querySelector("[data-group-summary]").textContent = selectedNames.join(", ") || "Select encounter groups";
     }
   }
 
   _updateMainCharacterOptions(row, userId) {
     const select = row.querySelector('[data-field="actorUuid"]');
-    const search = row.querySelector("[data-actor-search]");
     const currentUuid = select.value;
     const user = game.users.get(userId);
-    search.value = "";
     const placeholder = document.createElement("option");
     placeholder.value = "";
     placeholder.textContent = "Select an actor";
     select.replaceChildren(placeholder);
-    if (!user) return;
-    const actors = playerActorOptions(user);
-    for (const actor of actors) {
+    select.size = 1;
+    if (user) {
+      const actors = playerActorOptions(user);
+      for (const actor of actors) {
+        const option = document.createElement("option");
+        option.value = actor.uuid;
+        option.textContent = actor.name;
+        select.append(option);
+      }
+      if (actors.some((actor) => actor.uuid === currentUuid)) select.value = currentUuid;
+      select.size = actors.length > 10 ? 10 : 1;
+    }
+  }
+
+  _refreshAvailablePlayers() {
+    const select = this.element.querySelector('[data-app-action="add-player"]');
+    const configuredUsers = new Set(Array.from(this.element.querySelectorAll(
+      '[data-config-collection="players"] [data-field="userId"]'
+    )).map((field) => field.value).filter(Boolean));
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select a player";
+    select.replaceChildren(placeholder);
+    for (const user of this.users) {
+      if (configuredUsers.has(user.id)) continue;
+      const option = document.createElement("option");
+      option.value = user.id;
+      option.textContent = user.name;
+      select.append(option);
+    }
+  }
+
+  _createRosterRow(member = {}) {
+    const row = document.createElement("div");
+    row.dataset.rosterRow = "";
+    row.className = "qb-roster-config-row";
+
+    const actorLabel = document.createElement("label");
+    actorLabel.className = "qb-field qb-actor-field";
+    const actorLabelText = document.createElement("span");
+    actorLabelText.textContent = "Actor";
+    const actorSelect = document.createElement("select");
+    actorSelect.dataset.dialogField = "actorUuid";
+    actorSelect.setAttribute("aria-label", "Enemy actor");
+    actorSelect.size = this.actorOptions.length > 10 ? 10 : 1;
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Use a custom name";
+    actorSelect.append(placeholder);
+    const selectedUuid = member.actorUuid ?? game.actors.get(member.actorId)?.uuid ?? "";
+    for (const actor of this.actorOptions) {
       const option = document.createElement("option");
       option.value = actor.uuid;
       option.textContent = actor.name;
-      select.append(option);
+      option.selected = actor.uuid === selectedUuid;
+      actorSelect.append(option);
     }
-    if (actors.some((actor) => actor.uuid === currentUuid)) select.value = currentUuid;
-    this._filterActorOptions(search, select);
+    if (selectedUuid && !this.actorOptions.some((actor) => actor.uuid === selectedUuid)) {
+      const unavailable = document.createElement("option");
+      unavailable.value = selectedUuid;
+      unavailable.textContent = "Unavailable selection";
+      unavailable.selected = true;
+      actorSelect.append(unavailable);
+    }
+    actorLabel.append(actorLabelText, actorSelect);
+
+    const nameLabel = document.createElement("label");
+    nameLabel.className = "qb-field";
+    const nameText = document.createElement("span");
+    nameText.textContent = "Custom name";
+    const nameInput = document.createElement("input");
+    nameInput.dataset.dialogField = "name";
+    nameInput.value = member.name ?? "";
+    nameInput.placeholder = "Optional";
+    nameLabel.append(nameText, nameInput);
+
+    const countLabel = document.createElement("label");
+    countLabel.className = "qb-field";
+    const countText = document.createElement("span");
+    countText.textContent = "Count";
+    const countInput = document.createElement("input");
+    countInput.dataset.dialogField = "count";
+    countInput.type = "number";
+    countInput.min = "1";
+    countInput.step = "1";
+    countInput.value = member.count ?? 1;
+    countInput.required = true;
+    countLabel.append(countText, countInput);
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "qb-secondary";
+    removeButton.dataset.appAction = "remove-row";
+    removeButton.textContent = "Remove enemy";
+    row.append(actorLabel, nameLabel, countLabel, removeButton);
+    return row;
+  }
+
+  _openEncounterDialog(button) {
+    const form = this.element.querySelector(".qb-configuration-form");
+    this.configDraft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
+    const encounterId = button.closest("[data-encounter-id]").dataset.encounterId;
+    const encounter = this.configDraft.encounters.find((entry) => entry.id === encounterId);
+    if (!encounter) throw new Error("The selected encounter could not be found.");
+    this.activeEncounterId = encounterId;
+    const dialog = this.element.querySelector("[data-encounter-dialog]");
+    dialog.querySelector("[data-dialog-title]").textContent = `Configure ${encounter.name || "encounter"}`;
+    dialog.querySelector('[data-dialog-field="description"]').value = encounter.description ?? "";
+    dialog.querySelector('[data-dialog-field="difficultyLabel"]').value = encounter.difficultyLabel ?? "";
+    dialog.querySelector('[data-dialog-field="dc"]').value = encounter.dc ?? "";
+    const roster = dialog.querySelector("[data-dialog-roster]");
+    roster.replaceChildren(...(encounter.roster ?? []).map((member) => this._createRosterRow(member)));
+    dialog.showModal();
+  }
+
+  _saveEncounterDialog() {
+    const dialog = this.element.querySelector("[data-encounter-dialog]");
+    for (const input of dialog.querySelectorAll("input:invalid, select:invalid, textarea:invalid")) {
+      if (!input.reportValidity()) return;
+    }
+    this.configDraft = readConfigurationForm(
+      this.element.querySelector(".qb-configuration-form"),
+      this.configDraft ?? DEFAULT_CONFIG
+    );
+    const encounter = this.configDraft.encounters.find((entry) => entry.id === this.activeEncounterId);
+    if (!encounter) throw new Error("The encounter being edited no longer exists.");
+    encounter.description = dialog.querySelector('[data-dialog-field="description"]').value.trim();
+    encounter.difficultyLabel = dialog.querySelector('[data-dialog-field="difficultyLabel"]').value.trim();
+    const dc = dialog.querySelector('[data-dialog-field="dc"]').value.trim();
+    if (dc === "") delete encounter.dc;
+    else encounter.dc = Number(dc);
+    encounter.roster = Array.from(dialog.querySelectorAll("[data-dialog-roster] [data-roster-row]"))
+      .map((row) => ({
+        actorUuid: row.querySelector('[data-dialog-field="actorUuid"]').value,
+        name: row.querySelector('[data-dialog-field="name"]').value.trim(),
+        count: Number(row.querySelector('[data-dialog-field="count"]').value)
+      }))
+      .filter((member) => member.actorUuid || member.name);
+    dialog.close();
+    this.activeEncounterId = null;
+  }
+
+  async _confirmGroupDeletion(groupName, linkedCount, replacementName) {
+    const dialog = this.element.querySelector("[data-group-confirm-dialog]");
+    const noun = linkedCount === 1 ? "encounter" : "encounters";
+    dialog.querySelector("[data-confirm-message]").textContent = (
+      `“${groupName}” is linked to ${linkedCount} ${noun}. If you continue, `
+      + `those ${noun} will also be assigned to “${replacementName}”.`
+    );
+    const result = new Promise((resolve) => {
+      dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm"), { once: true });
+    });
+    dialog.returnValue = "";
+    dialog.showModal();
+    return result;
+  }
+
+  async _removeEncounterGroup(button) {
+    const form = this.element.querySelector(".qb-configuration-form");
+    const draft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
+    const row = button.closest("[data-config-row]");
+    const groupId = row.querySelector('[data-field="id"]').value;
+    if (draft.encounterGroups.length <= 1) {
+      ui.notifications.warn("At least one encounter group must remain.");
+      return;
+    }
+    const group = draft.encounterGroups.find((entry) => entry.id === groupId);
+    if (!group) throw new Error("The selected encounter group could not be found.");
+    const linked = draft.encounters.filter((encounter) => encounter.groups.includes(groupId));
+    const remaining = draft.encounterGroups.filter((entry) => entry.id !== groupId);
+    if (linked.length) {
+      const confirmed = await this._confirmGroupDeletion(group.name, linked.length, remaining[0].name);
+      if (!confirmed) return;
+    }
+    draft.encounterGroups = remaining;
+    draft.encounters = reassignEncounterGroup(draft.encounters, groupId, remaining[0].id);
+    this.configDraft = draft;
+    return this.render();
   }
 
   async _handleConfigurationAction(button) {
     const action = button.dataset.appAction;
     if (action === "save-config") {
-      if (!this.element.querySelector(".qb-configuration-form").reportValidity()) return;
-      this.configDraft = await writeConfig(readConfigurationForm(this.element));
+      const form = this.element.querySelector(".qb-configuration-form");
+      if (!form.reportValidity()) return;
+      this.configDraft = await writeConfig(readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG));
       ui.notifications.info("Quick Battles configuration saved.");
       mainApplication?.render();
       return this.close();
     }
     if (action === "remove-row") {
-      button.closest("[data-config-row], [data-roster-row]")?.remove();
+      const row = button.closest("[data-config-row], [data-roster-row]");
+      if (row?.closest("[data-dialog-roster]")) {
+        row.remove();
+        return;
+      }
+      const form = this.element.querySelector(".qb-configuration-form");
+      this.configDraft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
+      row?.remove();
+      this.configDraft = readConfigurationForm(form, this.configDraft);
+      return this.render();
+    }
+    if (action === "remove-group") {
+      return this._removeEncounterGroup(button);
+    }
+    if (action === "edit-encounter") {
+      return this._openEncounterDialog(button);
+    }
+    if (action === "cancel-encounter-dialog") {
+      this.element.querySelector("[data-encounter-dialog]").close();
+      this.activeEncounterId = null;
       return;
     }
-    this.configDraft = readConfigurationForm(this.element);
-    if (action === "add-player") this.configDraft.players.push({ userId: "", actorUuid: "" });
+    if (action === "save-encounter-dialog") {
+      return this._saveEncounterDialog();
+    }
+    if (action === "add-dialog-roster") {
+      this.element.querySelector("[data-dialog-roster]").append(this._createRosterRow());
+      return;
+    }
+    const form = this.element.querySelector(".qb-configuration-form");
+    this.configDraft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
+    if (action === "add-player") {
+      if (!button.value) return;
+      this.configDraft.players.push({ userId: button.value, actorUuid: "" });
+    }
     else if (action === "add-group") this.configDraft.encounterGroups.push({ id: randomId(), name: "" });
     else if (action === "add-encounter") {
       this.configDraft.encounters.push({
@@ -767,9 +994,6 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       this.configDraft.encounterDifficultyBands.push({ min: 1, max: 0, label: "", dc: 0 });
     } else if (action === "add-override") {
       this.configDraft.catalogOverrides.push({ name: "", type: "Active", rating: "Low" });
-    } else if (action === "add-roster") {
-      const encounterIndex = Number(button.closest("[data-config-row]").dataset.index);
-      this.configDraft.encounters[encounterIndex].roster.push({ actorUuid: "", name: "", count: 1 });
     }
     return this.render();
   }
