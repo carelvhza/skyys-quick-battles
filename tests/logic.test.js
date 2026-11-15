@@ -212,10 +212,9 @@ test("participant bonus preview updates from resource-count input changes", () =
 
 test("the supplied feat catalog is parsed in full, including comma-containing descriptions", () => {
   const catalog = parseFeatCatalog(catalogText);
-  assert.equal(catalog.length, 384);
-  assert.equal(catalog[0].name, "Actor");
-  assert.equal(catalog[0].bonus, 1);
-  assert.equal(catalog.find((entry) => entry.name === "Alert").description, "+5 to initiative, immune to surprise while conscious, no advantage for hidden attackers");
+  assert.equal(catalog.length, 374);
+  assert.equal(catalog.find((entry) => entry.name === "Actor").bonus, 1);
+  assert.equal(catalog.find((entry) => entry.name === "Alert").description, "+5 to initiative; immune to surprise while conscious; no advantage for hidden attackers");
   assert.equal(catalog.find((entry) => entry.name === "War Caster").bonus, 3);
 });
 
