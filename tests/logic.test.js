@@ -47,9 +47,11 @@ test("configuration is available through a structured Foundry settings menu", ()
   assert.match(configurationTemplate, /data-config-collection="encounters"/);
   assert.match(configurationTemplate, /data-field="fateDcEasy"/);
   assert.match(configurationTemplate, /data-config-collection="catalogOverrides"/);
-  assert.match(styleSource, /\.quick-battles-config\s*\{\s*width: 70vw !important/);
-  assert.match(styleSource, /@media \(max-width: 40rem\)[\s\S]*\.quick-battles-config/);
-  assert.match(configurationTemplate, /qb-config-intro/);
+  assert.match(applicationSource, /const width = Math\.min\([\s\S]*?viewportWidth \* 0\.7/);
+  assert.match(styleSource, /\.qb-config-summary-grid\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(styleSource, /@container quick-battles \(max-width: 40rem\)[\s\S]*\.qb-config-summary-grid/);
+  assert.match(styleSource, /\.qb-section\s*\{\s*border-color: color-mix/);
+  assert.match(configurationTemplate, /qb-config-shell/);
   assert.match(applicationSource, /actor\.testUserPermission\(user, "OWNER"\)/);
   assert.match(applicationSource, /if \(!user\.isGM && actor\.type !== "character"\)/);
   assert.match(configurationTemplate, /data-field="id" type="hidden"/);
@@ -59,7 +61,7 @@ test("configuration is available through a structured Foundry settings menu", ()
 
 test("configuration sections use the requested order and encounter details open in an accessible dialog", () => {
   const sections = [
-    "Player characters",
+    "Participating Player Actors",
     "Encounter groups",
     "Encounters",
     "Encounter difficulty bands",
@@ -78,6 +80,8 @@ test("configuration sections use the requested order and encounter details open 
   assert.match(configurationTemplate, /data-dialog-roster/);
   assert.match(configurationTemplate, /data-group-summary/);
   assert.match(configurationTemplate, /data-field="description" rows="2"/);
+  assert.match(configurationTemplate, /data-field="combat" type="checkbox"/);
+  assert.doesNotMatch(configurationTemplate, /type="text" data-field="(?:min|max|dc|combat)"/);
   assert.match(applicationSource, /baseConfig\.catalogOverrides\[index\]/);
   assert.match(applicationSource, /dialog\.showModal\(\)/);
 });
