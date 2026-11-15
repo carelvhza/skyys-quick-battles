@@ -614,7 +614,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
   static DEFAULT_OPTIONS = {
     id: `${MODULE_ID}-configuration`,
     classes: ["quick-battles-app", "quick-battles-config"],
-    position: { width: "60vw", height: "auto" },
+    position: { width: 720, height: "auto" },
     window: { title: "Quick Battles Configuration", resizable: true }
   };
 
@@ -623,7 +623,15 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
   };
 
   constructor(options = {}) {
-    super(options);
+    const viewportWidth = window.innerWidth;
+    const width = Math.min(
+      Math.max(Math.round(viewportWidth * 0.7), Math.min(384, viewportWidth - 16)),
+      viewportWidth - 16
+    );
+    super({
+      ...options,
+      position: { width, height: "auto", ...options.position }
+    });
     this.configDraft = null;
     this.actorOptions = [];
     this.users = [];
