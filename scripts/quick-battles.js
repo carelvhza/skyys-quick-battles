@@ -666,8 +666,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         return {
           ...player,
           users: withSelectedOption(users, player.userId, "id"),
-          actors: selectedActors,
-          actorListSize: selectedActors.length > 10 ? 10 : 1
+          actors: selectedActors
         };
       }),
       encounters: config.encounters.map((encounter) => ({
@@ -763,7 +762,6 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     placeholder.value = "";
     placeholder.textContent = "Select an actor";
     select.replaceChildren(placeholder);
-    select.size = 1;
     if (user) {
       const actors = playerActorOptions(user);
       for (const actor of actors) {
@@ -773,7 +771,6 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         select.append(option);
       }
       if (actors.some((actor) => actor.uuid === currentUuid)) select.value = currentUuid;
-      select.size = actors.length > 10 ? 10 : 1;
     }
   }
 
