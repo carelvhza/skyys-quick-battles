@@ -42,6 +42,51 @@
   gap: 0.85rem;
 }
 
+.qb-config-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: 0.85rem;
+}
+
+.qb-config-tabs {
+  align-content: start;
+}
+
+.qb-config-tab-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--color-border-light-2);
+}
+
+.qb-config-tab-list [role="tab"] {
+  min-width: 0;
+  min-height: 2.4rem;
+  padding: 0.35rem;
+  border: 1px solid var(--color-border-light-2);
+  border-radius: 0.35rem;
+  background: var(--color-cool-4);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.qb-config-tab-list [role="tab"][aria-selected="true"] {
+  border-color: var(--color-warm-1);
+  background: color-mix(in srgb, var(--color-warm-2) 20%, var(--color-cool-4));
+  color: var(--color-text-primary);
+}
+
+.qb-config-tab-panel {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.qb-config-tab-panel[hidden] {
+  display: none;
+}
+
 .qb-config-intro,
 .qb-config-save {
   grid-column: 1 / -1;
@@ -350,6 +395,31 @@
   border: none !important;
   margin: 0 !important;
   gap: 12px !important;
+}
+
+.qb-config-rows .qb-feature-row {
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem;
+}
+
+.qb-feature-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.qb-feature-badge {
+  justify-self: start;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--color-border-light-2);
+  border-radius: 999px;
+  background: var(--color-cool-4);
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .qb-config-actions {
@@ -732,6 +802,10 @@
 }
 
 @container quick-battles (max-width: 40rem) {
+  .qb-config-top-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .qb-config-summary-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -740,7 +814,12 @@
   .qb-config-rows .qb-group-row,
   .qb-config-rows .qb-encounter-config-row,
   .qb-config-rows .qb-difficulty-row,
+  .qb-config-rows .qb-feature-row,
   .qb-config-rows .qb-roster-config-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .qb-config-tab-list {
     grid-template-columns: minmax(0, 1fr);
   }
 

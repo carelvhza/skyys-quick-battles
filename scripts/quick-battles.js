@@ -636,6 +636,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     this.actorOptions = [];
     this.users = [];
     this.activeEncounterId = null;
+    this.activeCatalogIndex = null;
   }
 
   async _prepareContext() {
@@ -692,11 +693,8 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       })),
       catalogOverrides: config.catalogOverrides.map((override) => ({
         ...override,
-        isPassive: override.type === "Passive",
-        isActive: override.type === "Active",
-        isLow: override.rating === "Low",
-        isMedium: override.rating === "Medium",
-        isHigh: override.rating === "High"
+        type: override.type ?? "Active",
+        rating: override.rating ?? "Low"
       })),
       spellSlots: Array.from({ length: 9 }, (_, index) => {
         const level = index + 1;
@@ -729,6 +727,24 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         this._updateGroupSummaries();
       }
     });
+    this.element.addEventListener("keydown", (event) => {
+      if (!event.target.matches("[data-config-tab]")) return;
+      const tabs = Array.from(this.element.querySelectorAll("[data-config-tab]"));
+      const currentIndex = tabs.indexOf(event.target);
+      const nextIndex = event.key === "ArrowRight"
+        ? (currentIndex + 1) % tabs.length
+        : event.key === "ArrowLeft"
+          ? (currentIndex - 1 + tabs.length) % tabs.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? tabs.length - 1
+              : -1;
+      if (nextIndex < 0) return;
+      event.preventDefault();
+      tabs[nextIndex].focus();
+      this._selectConfigurationTab(tabs[nextIndex]);
+    });
     this.element.addEventListener("input", (event) => {
       const field = event.target;
       if (field.matches('[data-config-collection="encounterGroups"] [data-field="name"]')) {
@@ -753,6 +769,31 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       }
       row.querySelector("[data-group-summary]").textContent = selectedNames.join(", ") || "Select encounter groups";
     }
+  }
+
+  _selectConfigurationTab(tab) {
+    const selectedTab = typeof tab === "string"
+      ? this.element.querySelector(`[data-config-tab="${tab}"]`)
+      : tab;
+    if (!selectedTab) return;
+    for (const button of this.element.querySelectorAll("[data-config-tab]")) {
+      const selected = button === selectedTab;
+      button.setAttribute("aria-selected", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
+    for (const panel of this.element.querySelectorAll("[data-config-tab-panel]")) {
+      panel.hidden = panel.dataset.configTabPanel !== selectedTab.dataset.configTab;
+    }
+  }
+
+  _selectedConfigurationTab() {
+    return this.element.querySelector('[data-config-tab][aria-selected="true"]')?.dataset.configTab ?? "groups";
+  }
+
+  async _rerenderConfiguration({ tab = this._selectedConfigurationTab(), openCatalogManager = false } = {}) {
+    await this.render({ force: true });
+    this._selectConfigurationTab(tab);
+    if (openCatalogManager) this.element.querySelector("[data-catalog-manager-dialog]").showModal();
   }
 
   _updateMainCharacterOptions(row, userId) {
@@ -878,6 +919,65 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     dialog.showModal();
   }
 
+  _openCatalogDialog(row) {
+    this.configDraft = readConfigurationForm(
+      this.element.querySelector(".qb-configuration-form"),
+      this.configDraft ?? DEFAULT_CONFIG
+    );
+    const index = Number(row.dataset.configIndex);
+    const override = this.configDraft.catalogOverrides[index];
+    if (!override) throw new Error("The selected catalog feature could not be found.");
+    this.activeCatalogIndex = index;
+    const dialog = this.element.querySelector("[data-catalog-edit-dialog]");
+    dialog.querySelector("[data-catalog-dialog-title]").textContent = `Configure ${override.name || "feature"}`;
+    for (const name of ["name", "description", "type", "rating", "bonus", "bonusPerUse"]) {
+      const field = dialog.querySelector(`[data-catalog-dialog-field="${name}"]`);
+      field.value = override[name] ?? "";
+    }
+    dialog.querySelector('[data-catalog-dialog-field="disabled"]').checked = override.disabled === true;
+    dialog.showModal();
+  }
+
+  _saveCatalogDialog() {
+    const dialog = this.element.querySelector("[data-catalog-edit-dialog]");
+    if (!dialog.reportValidity()) return;
+    this.configDraft = readConfigurationForm(
+      this.element.querySelector(".qb-configuration-form"),
+      this.configDraft ?? DEFAULT_CONFIG
+    );
+    const override = this.configDraft.catalogOverrides[this.activeCatalogIndex];
+    if (!override) throw new Error("The catalog feature being edited no longer exists.");
+    for (const name of ["name", "description", "type", "rating"]) {
+      override[name] = dialog.querySelector(`[data-catalog-dialog-field="${name}"]`).value.trim();
+    }
+    for (const name of ["bonus", "bonusPerUse"]) {
+      const value = dialog.querySelector(`[data-catalog-dialog-field="${name}"]`).value.trim();
+      if (value === "") delete override[name];
+      else override[name] = Number(value);
+    }
+    override.disabled = dialog.querySelector('[data-catalog-dialog-field="disabled"]').checked;
+    const row = Array.from(this.element.querySelectorAll('[data-config-collection="catalogOverrides"] [data-config-row]'))
+      .find((entry) => Number(entry.dataset.configIndex) === this.activeCatalogIndex);
+    if (!row) throw new Error("The catalog feature row could not be updated.");
+    row.querySelector("[data-field='name']").value = override.name;
+    row.querySelector("[data-field='description']").value = override.description ?? "";
+    row.querySelector("[data-field='type']").value = override.type;
+    row.querySelector("[data-field='rating']").value = override.rating;
+    row.querySelector("[data-field='bonus']").value = override.bonus ?? "";
+    row.querySelector("[data-field='bonusPerUse']").value = override.bonusPerUse ?? "";
+    row.querySelector("[data-field='disabled']").checked = override.disabled;
+    row.querySelector("[data-feature-name]").textContent = override.name;
+    row.querySelector("[data-feature-type]").textContent = override.type;
+    row.querySelector("[data-feature-rating]").textContent = override.rating;
+    row.querySelector('[data-app-action="edit-catalog-override"]').setAttribute(
+      "aria-label",
+      `Configure ${override.name}`
+    );
+    row.querySelector('[data-app-action="remove-row"]').setAttribute("aria-label", `Remove ${override.name}`);
+    dialog.close();
+    this.activeCatalogIndex = null;
+  }
+
   _saveEncounterDialog() {
     const dialog = this.element.querySelector("[data-encounter-dialog]");
     for (const input of dialog.querySelectorAll("input:invalid, select:invalid, textarea:invalid")) {
@@ -921,6 +1021,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
   }
 
   async _removeEncounterGroup(button) {
+    const selectedTab = this._selectedConfigurationTab();
     const form = this.element.querySelector(".qb-configuration-form");
     const draft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
     const row = button.closest("[data-config-row]");
@@ -940,18 +1041,52 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     draft.encounterGroups = remaining;
     draft.encounters = reassignEncounterGroup(draft.encounters, groupId, remaining[0].id);
     this.configDraft = draft;
-    return this.render();
+    return this._rerenderConfiguration({ tab: selectedTab });
   }
 
   async _handleConfigurationAction(button) {
     const action = button.dataset.appAction;
     if (action === "save-config") {
       const form = this.element.querySelector(".qb-configuration-form");
-      if (!form.reportValidity()) return;
+      const invalidField = form.querySelector(":invalid");
+      if (invalidField) {
+        const panel = invalidField.closest("[data-config-tab-panel]");
+        if (panel) this._selectConfigurationTab(panel.dataset.configTabPanel);
+        invalidField.reportValidity();
+        return;
+      }
       this.configDraft = await writeConfig(readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG));
       ui.notifications.info("Quick Battles configuration saved.");
       mainApplication?.render();
       return this.close();
+    }
+    if (action === "select-config-tab") {
+      this._selectConfigurationTab(button);
+      return;
+    }
+    if (action === "open-catalog-manager") {
+      this.configDraft = readConfigurationForm(
+        this.element.querySelector(".qb-configuration-form"),
+        this.configDraft ?? DEFAULT_CONFIG
+      );
+      this.element.querySelector("[data-catalog-manager-dialog]").showModal();
+      return;
+    }
+    if (action === "close-catalog-manager") {
+      this.element.querySelector("[data-catalog-manager-dialog]").close();
+      return;
+    }
+    if (action === "edit-catalog-override") {
+      this._openCatalogDialog(button.closest("[data-config-row]"));
+      return;
+    }
+    if (action === "cancel-catalog-dialog") {
+      this.element.querySelector("[data-catalog-edit-dialog]").close();
+      this.activeCatalogIndex = null;
+      return;
+    }
+    if (action === "save-catalog-dialog") {
+      return this._saveCatalogDialog();
     }
     if (action === "remove-row") {
       const row = button.closest("[data-config-row], [data-roster-row]");
@@ -959,11 +1094,14 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         row.remove();
         return;
       }
+      const reopenCatalogManager = Boolean(row?.closest("[data-catalog-manager-dialog]")?.open);
+      const selectedTab = this._selectedConfigurationTab();
       const form = this.element.querySelector(".qb-configuration-form");
       this.configDraft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
       row?.remove();
       this.configDraft = readConfigurationForm(form, this.configDraft);
-      return this.render();
+      await this._rerenderConfiguration({ tab: selectedTab, openCatalogManager: reopenCatalogManager });
+      return;
     }
     if (action === "remove-group") {
       return this._removeEncounterGroup(button);
@@ -1002,8 +1140,19 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       this.configDraft.encounterDifficultyBands.push({ min: 1, max: 0, label: "", dc: 0 });
     } else if (action === "add-override") {
       this.configDraft.catalogOverrides.push({ name: "", type: "Active", rating: "Low" });
+      const index = this.configDraft.catalogOverrides.length - 1;
+      await this._rerenderConfiguration({ openCatalogManager: true });
+      const row = Array.from(this.element.querySelectorAll('[data-config-collection="catalogOverrides"] [data-config-row]'))
+        .find((entry) => Number(entry.dataset.configIndex) === index);
+      this._openCatalogDialog(row);
+      return;
     }
-    return this.render();
+    const selectedTab = action === "add-encounter"
+      ? "encounters"
+      : action === "add-band"
+        ? "difficulty"
+        : this._selectedConfigurationTab();
+    return this._rerenderConfiguration({ tab: selectedTab });
   }
 }
 

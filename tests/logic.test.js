@@ -73,17 +73,31 @@ test("configuration sections use the requested order and encounter details open 
   const positions = sections.map((title) => configurationTemplate.indexOf(`<h2>${title}</h2>`));
   assert.ok(positions.every((position) => position >= 0));
   assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+  assert.match(configurationTemplate, /class="qb-config-top-grid"[\s\S]*Participating Player Actors[\s\S]*role="tablist"[\s\S]*data-config-tab-panel="groups"[\s\S]*data-config-tab-panel="encounters"[\s\S]*data-config-tab-panel="difficulty"/);
+  assert.match(configurationTemplate, /class="qb-config-summary-grid"[\s\S]*Fate and travel[\s\S]*Spell slot bonuses[\s\S]*Results and damage/);
+  assert.match(configurationTemplate, /data-app-action="open-catalog-manager"/);
+  assert.match(configurationTemplate, /data-catalog-manager-dialog/);
+  assert.match(configurationTemplate, /data-catalog-edit-dialog/);
+  assert.match(configurationTemplate, /data-feature-name/);
+  assert.match(configurationTemplate, /data-feature-type/);
+  assert.match(configurationTemplate, /data-feature-rating/);
+  assert.match(configurationTemplate, /data-app-action="edit-catalog-override"/);
+  assert.match(configurationTemplate, /data-catalog-dialog-field="description"/);
+  assert.match(configurationTemplate, /data-catalog-dialog-field="bonusPerUse"/);
+  assert.match(configurationTemplate, /data-catalog-dialog-field="disabled"/);
   assert.match(configurationTemplate, /<dialog[^>]*data-encounter-dialog[^>]*aria-labelledby=/);
   assert.match(configurationTemplate, /data-dialog-field="description"/);
   assert.match(configurationTemplate, /data-dialog-field="difficultyLabel"/);
   assert.match(configurationTemplate, /data-dialog-field="dc"/);
   assert.match(configurationTemplate, /data-dialog-roster/);
   assert.match(configurationTemplate, /data-group-summary/);
-  assert.match(configurationTemplate, /data-field="description" rows="2"/);
+  assert.match(configurationTemplate, /data-field="description" type="hidden"/);
   assert.match(configurationTemplate, /data-field="combat" type="checkbox"/);
   assert.doesNotMatch(configurationTemplate, /type="text" data-field="(?:min|max|dc|combat)"/);
   assert.match(applicationSource, /baseConfig\.catalogOverrides\[index\]/);
   assert.match(applicationSource, /dialog\.showModal\(\)/);
+  assert.match(applicationSource, /_selectConfigurationTab\(tab\)/);
+  assert.match(applicationSource, /activeCatalogIndex/);
 });
 
 test("Quick Battles remembers selections without duplicate main-window configuration", () => {
@@ -206,12 +220,11 @@ test("participant bonus preview updates from resource-count input changes", () =
   assert.match(styleSource, /\.qb-active-bonus-preview\s*\{\s*margin: 0;[\s\S]*justify-content: space-between/);
 });
 
-test("the supplied feat catalog is parsed in full, including comma-containing descriptions", () => {
+test("the supplied feat catalog is parsed in full, including semicolon-containing descriptions", () => {
   const catalog = parseFeatCatalog(catalogText);
-  assert.equal(catalog.length, 384);
-  assert.equal(catalog[0].name, "Actor");
-  assert.equal(catalog[0].bonus, 1);
-  assert.equal(catalog.find((entry) => entry.name === "Alert").description, "+5 to initiative, immune to surprise while conscious, no advantage for hidden attackers");
+  assert.equal(catalog.length, 374);
+  assert.equal(catalog.find((entry) => entry.name === "Actor").bonus, 1);
+  assert.equal(catalog.find((entry) => entry.name === "Alert").description, "+5 to initiative; immune to surprise while conscious; no advantage for hidden attackers");
   assert.equal(catalog.find((entry) => entry.name === "War Caster").bonus, 3);
 });
 
