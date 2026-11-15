@@ -1,104 +1,114 @@
 <div class="qb-shell qb-config-shell">
   <form class="qb-configuration-form">
-    <section class="qb-section">
-      <div class="qb-section-heading">
-        <h2>Participating Player Actors</h2>
-        <label class="qb-add-player">
-          <span>Add a player</span>
-          <select data-app-action="add-player" aria-label="Add a player character mapping">
-            <option value="">Select a player</option>
-            {{#each availableUsers}}<option value="{{id}}">{{name}}</option>{{/each}}
-          </select>
-        </label>
-      </div>
-      <div class="qb-config-rows" data-config-collection="players">
-        {{#each config.players}}
-          <fieldset data-config-row class="qb-player-row">
-            <label class="qb-field">
-              <select data-field="userId">
-                {{#each users}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
-              </select>
-            </label>
-            <label class="qb-field qb-actor-field">
-              <span>Player actor</span>
-              <select data-field="actorUuid" data-actor-selector size="{{actorListSize}}" required>
-                <option value="">Select an actor</option>
-                {{#each actors}}<option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
-              </select>
-            </label>
-            <button type="button" class="qb-secondary" data-app-action="remove-row" aria-label="Remove player character mapping">Remove</button>
-          </fieldset>
-        {{/each}}
-      </div>
-    </section>
-
-    <section class="qb-section">
-      <div class="qb-section-heading">
-        <h2>Encounter groups</h2>
-        <button type="button" class="qb-secondary" data-app-action="add-group">Add group</button>
-      </div>
-      <div class="qb-config-rows" data-config-collection="encounterGroups">
-        {{#each config.encounterGroups}}
-          <fieldset data-config-row class="qb-group-row">
-            <input data-field="id" type="hidden" value="{{id}}" />
-            <label class="qb-field"><input type="text" data-field="name" value="{{name}}" required /></label>
-            <button type="button" class="qb-secondary" data-app-action="remove-group" aria-label="Remove encounter group {{name}}">Remove group</button>
-          </fieldset>
-        {{/each}}
-      </div>
-    </section>
-
-    <section class="qb-section">
-      <div class="qb-section-heading">
-        <h2>Encounters</h2>
-        <button type="button" class="qb-secondary" data-app-action="add-encounter">Add encounter</button>
-      </div>
-      <div class="qb-config-rows" data-config-collection="encounters">
-        {{#each config.encounters}}
-          <fieldset data-config-row data-encounter-id="{{id}}" class="qb-encounter-config-row">
-            <input data-field="id" type="hidden" value="{{id}}" />
-            <label class="qb-field"><span>Encounter name</span><input type="text" data-field="name" value="{{name}}" required /></label>
-            <div class="qb-field qb-group-field">
-              <span>Encounter groups</span>
-              <details class="qb-group-picker">
-                <summary data-group-summary>{{selectedGroupSummary}}</summary>
-                <div class="qb-config-checks">
-                  {{#each groupOptions}}
-                    <label><input data-field="groups" type="checkbox" value="{{id}}" {{#if selected}}checked{{/if}} /> <span data-group-name>{{name}}</span></label>
-                  {{else}}
-                    <span class="qb-muted">Add an encounter group first.</span>
-                  {{/each}}
-                </div>
-              </details>
-            </div>
-            <div class="qb-config-actions">
-              <button type="button" class="qb-secondary" data-app-action="edit-encounter" aria-label="Configure encounter {{name}}">Configure</button>
-              <button type="button" class="qb-secondary" data-app-action="remove-row" aria-label="Remove encounter {{name}}">Remove</button>
-            </div>
-          </fieldset>
-        {{/each}}
-      </div>
-    </section>
-
-    <div class="qb-config-summary-grid">
+    <div class="qb-config-top-grid">
       <section class="qb-section">
-        <h2>Encounter difficulty bands</h2>
-        <p class="qb-muted">Ranges must cover d20 results 1–20 contiguously, without gaps or overlaps.</p>
-        <div class="qb-config-rows" data-config-collection="encounterDifficultyBands">
-          {{#each config.encounterDifficultyBands}}
-            <fieldset data-config-row class="qb-difficulty-row">
-              <label class="qb-field"><span>Min roll</span><input data-field="min" type="number" min="1" max="20" value="{{min}}" required /></label>
-              <label class="qb-field"><span>Max roll</span><input data-field="max" type="number" min="1" max="20" value="{{max}}" required /></label>
-              <label class="qb-field"><span>Label</span><input type="text" data-field="label" value="{{label}}" required /></label>
-              <label class="qb-field"><span>DC</span><input data-field="dc" type="number" value="{{dc}}" required /></label>
-              <label class="qb-checkbox-field"><input data-field="combat" type="checkbox" {{#if isCombat}}checked{{/if}} /> Combat</label>
-              <button type="button" class="qb-secondary" data-app-action="remove-row">Remove</button>
+        <div class="qb-section-heading">
+          <h2>Participating Player Actors</h2>
+          <label class="qb-add-player">
+            <span>Add a player</span>
+            <select data-app-action="add-player" aria-label="Add a player character mapping">
+              <option value="">Select a player</option>
+              {{#each availableUsers}}<option value="{{id}}">{{name}}</option>{{/each}}
+            </select>
+          </label>
+        </div>
+        <div class="qb-config-rows" data-config-collection="players">
+          {{#each config.players}}
+            <fieldset data-config-row class="qb-player-row">
+              <label class="qb-field">
+                <select data-field="userId">
+                  {{#each users}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+                </select>
+              </label>
+              <label class="qb-field qb-actor-field">
+                <span>Player actor</span>
+                <select data-field="actorUuid" data-actor-selector size="{{actorListSize}}" required>
+                  <option value="">Select an actor</option>
+                  {{#each actors}}<option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+                </select>
+              </label>
+              <button type="button" class="qb-secondary" data-app-action="remove-row" aria-label="Remove player character mapping">Remove</button>
             </fieldset>
           {{/each}}
         </div>
-        <button type="button" class="qb-secondary" data-app-action="add-band">Add difficulty band</button>
       </section>
 
+      <section class="qb-section qb-config-tabs">
+        <div class="qb-config-tab-list" role="tablist" aria-label="Encounter configuration">
+          <button type="button" id="qb-tab-groups" role="tab" aria-selected="true" aria-controls="qb-panel-groups" tabindex="0" data-config-tab="groups" data-app-action="select-config-tab">Encounter Groups</button>
+          <button type="button" id="qb-tab-encounters" role="tab" aria-selected="false" aria-controls="qb-panel-encounters" tabindex="-1" data-config-tab="encounters" data-app-action="select-config-tab">Encounters</button>
+          <button type="button" id="qb-tab-difficulty" role="tab" aria-selected="false" aria-controls="qb-panel-difficulty" tabindex="-1" data-config-tab="difficulty" data-app-action="select-config-tab">Difficulty Bands</button>
+        </div>
+
+        <div id="qb-panel-groups" class="qb-config-tab-panel" role="tabpanel" aria-labelledby="qb-tab-groups" data-config-tab-panel="groups">
+          <div class="qb-section-heading">
+            <h2>Encounter groups</h2>
+            <button type="button" class="qb-secondary" data-app-action="add-group">Add group</button>
+          </div>
+          <div class="qb-config-rows" data-config-collection="encounterGroups">
+            {{#each config.encounterGroups}}
+              <fieldset data-config-row class="qb-group-row">
+                <input data-field="id" type="hidden" value="{{id}}" />
+                <label class="qb-field"><input type="text" data-field="name" value="{{name}}" required /></label>
+                <button type="button" class="qb-secondary" data-app-action="remove-group" aria-label="Remove encounter group {{name}}">Remove group</button>
+              </fieldset>
+            {{/each}}
+          </div>
+        </div>
+
+        <div id="qb-panel-encounters" class="qb-config-tab-panel" role="tabpanel" aria-labelledby="qb-tab-encounters" data-config-tab-panel="encounters" hidden>
+          <div class="qb-section-heading">
+            <h2>Encounters</h2>
+            <button type="button" class="qb-secondary" data-app-action="add-encounter">Add encounter</button>
+          </div>
+          <div class="qb-config-rows" data-config-collection="encounters">
+            {{#each config.encounters}}
+              <fieldset data-config-row data-encounter-id="{{id}}" class="qb-encounter-config-row">
+                <input data-field="id" type="hidden" value="{{id}}" />
+                <label class="qb-field"><span>Encounter name</span><input type="text" data-field="name" value="{{name}}" required /></label>
+                <div class="qb-field qb-group-field">
+                  <span>Encounter groups</span>
+                  <details class="qb-group-picker">
+                    <summary data-group-summary>{{selectedGroupSummary}}</summary>
+                    <div class="qb-config-checks">
+                      {{#each groupOptions}}
+                        <label><input data-field="groups" type="checkbox" value="{{id}}" {{#if selected}}checked{{/if}} /> <span data-group-name>{{name}}</span></label>
+                      {{else}}
+                        <span class="qb-muted">Add an encounter group first.</span>
+                      {{/each}}
+                    </div>
+                  </details>
+                </div>
+                <div class="qb-config-actions">
+                  <button type="button" class="qb-secondary" data-app-action="edit-encounter" aria-label="Configure encounter {{name}}">Configure</button>
+                  <button type="button" class="qb-secondary" data-app-action="remove-row" aria-label="Remove encounter {{name}}">Remove</button>
+                </div>
+              </fieldset>
+            {{/each}}
+          </div>
+        </div>
+
+        <div id="qb-panel-difficulty" class="qb-config-tab-panel" role="tabpanel" aria-labelledby="qb-tab-difficulty" data-config-tab-panel="difficulty" hidden>
+          <h2>Encounter difficulty bands</h2>
+          <p class="qb-muted">Ranges must cover d20 results 1–20 contiguously, without gaps or overlaps.</p>
+          <div class="qb-config-rows" data-config-collection="encounterDifficultyBands">
+            {{#each config.encounterDifficultyBands}}
+              <fieldset data-config-row class="qb-difficulty-row">
+                <label class="qb-field"><span>Min roll</span><input data-field="min" type="number" min="1" max="20" value="{{min}}" required /></label>
+                <label class="qb-field"><span>Max roll</span><input data-field="max" type="number" min="1" max="20" value="{{max}}" required /></label>
+                <label class="qb-field"><span>Label</span><input type="text" data-field="label" value="{{label}}" required /></label>
+                <label class="qb-field"><span>DC</span><input data-field="dc" type="number" value="{{dc}}" required /></label>
+                <label class="qb-checkbox-field"><input data-field="combat" type="checkbox" {{#if isCombat}}checked{{/if}} /> Combat</label>
+                <button type="button" class="qb-secondary" data-app-action="remove-row">Remove</button>
+              </fieldset>
+            {{/each}}
+          </div>
+          <button type="button" class="qb-secondary" data-app-action="add-band">Add difficulty band</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="qb-config-summary-grid">
       <section class="qb-section">
         <h2>Fate and travel</h2>
         <label class="qb-field"><span>Easy Fate DC</span><input data-field="fateDcEasy" type="number" value="{{config.fateDcs.easy}}" required /></label>
@@ -116,51 +126,90 @@
           <label class="qb-field"><span>Level {{level}} slot</span><input data-field="spellSlot{{level}}" type="number" value="{{bonus}}" required /></label>
         {{/each}}
       </section>
-    </div>
 
-    <section class="qb-section">
-      <h2>Results and damage</h2>
-      <label class="qb-field"><span>Maximum damage fraction (0–1)</span><input data-field="damageCap" type="number" min="0" max="1" step="0.05" value="{{config.damageCap}}" required /></label>
-      <label class="qb-checkbox-field"><input data-field="postGmResults" type="checkbox" {{#if config.postGmResults}}checked{{/if}} /> Post GM results to chat</label>
-    </section>
+      <section class="qb-section">
+        <h2>Results and damage</h2>
+        <label class="qb-field"><span>Maximum damage fraction (0–1)</span><input data-field="damageCap" type="number" min="0" max="1" step="0.05" value="{{config.damageCap}}" required /></label>
+        <label class="qb-checkbox-field"><input data-field="postGmResults" type="checkbox" {{#if config.postGmResults}}checked{{/if}} /> Post GM results to chat</label>
+      </section>
+    </div>
 
     <section class="qb-section">
       <div class="qb-section-heading">
         <h2>Feature catalog changes</h2>
-        <button type="button" class="qb-secondary" data-app-action="add-override">Add feature change</button>
+        <button type="button" class="qb-primary" data-app-action="open-catalog-manager">Manage feature catalog</button>
       </div>
       <p class="qb-muted">Add custom features, change a feature's type or bonus, or disable a catalog entry by name.</p>
-      <div class="qb-config-rows" data-config-collection="catalogOverrides">
-        {{#each config.catalogOverrides}}
-          <fieldset data-config-row data-config-index="{{@index}}" class="qb-feature-row">
-            <label class="qb-field"><span>Feature name</span><input type="text" data-field="name" value="{{name}}" required /></label>
-            <label class="qb-field"><span>Description override</span><textarea data-field="description" rows="2">{{description}}</textarea></label>
-            <label class="qb-field">
-              <span>Type</span>
-              <select data-field="type">
-                <option value="Passive" {{#if isPassive}}selected{{/if}}>Passive</option>
-                <option value="Active" {{#if isActive}}selected{{/if}}>Active</option>
-              </select>
-            </label>
-            <label class="qb-field">
-              <span>Rating</span>
-              <select data-field="rating">
-                <option value="Low" {{#if isLow}}selected{{/if}}>Low (+1)</option>
-                <option value="Medium" {{#if isMedium}}selected{{/if}}>Medium (+2)</option>
-                <option value="High" {{#if isHigh}}selected{{/if}}>High (+3)</option>
-              </select>
-            </label>
-            <label class="qb-field"><span>Passive bonus override</span><input data-field="bonus" type="number" value="{{bonus}}" /></label>
-            <label class="qb-field"><span>Bonus per active use override</span><input data-field="bonusPerUse" type="number" value="{{bonusPerUse}}" /></label>
-            <label class="qb-checkbox-field"><input data-field="disabled" type="checkbox" {{#if disabled}}checked{{/if}} /> Disable this catalog entry</label>
-            <button type="button" class="qb-secondary" data-app-action="remove-row">Remove feature change</button>
-          </fieldset>
-        {{/each}}
-      </div>
     </section>
 
     <button type="button" class="qb-primary qb-config-save" data-app-action="save-config">Validate and save settings</button>
   </form>
+
+  <dialog class="qb-config-dialog" data-catalog-manager-dialog aria-labelledby="qb-catalog-manager-title">
+    <div class="qb-dialog-content qb-catalog-manager-content">
+      <div class="qb-section-heading qb-dialog-wide">
+        <h2 id="qb-catalog-manager-title">Manage feature catalog</h2>
+        <button type="button" class="qb-secondary" data-app-action="close-catalog-manager" aria-label="Close feature catalog">Close</button>
+      </div>
+      <p class="qb-muted qb-dialog-wide">Add custom features, change a feature's type or bonus, or disable a catalog entry by name.</p>
+      <div class="qb-config-rows qb-dialog-wide" data-config-collection="catalogOverrides">
+        {{#each config.catalogOverrides}}
+          <fieldset data-config-row data-config-index="{{@index}}" class="qb-feature-row">
+            <input data-field="name" type="hidden" value="{{name}}" />
+            <input data-field="description" type="hidden" value="{{description}}" />
+            <input data-field="type" type="hidden" value="{{type}}" />
+            <input data-field="rating" type="hidden" value="{{rating}}" />
+            <input data-field="bonus" type="hidden" value="{{bonus}}" />
+            <input data-field="bonusPerUse" type="hidden" value="{{bonusPerUse}}" />
+            <input data-field="disabled" type="checkbox" {{#if disabled}}checked{{/if}} hidden />
+            <span class="qb-feature-name" data-feature-name>{{name}}</span>
+            <span class="qb-feature-badge" data-feature-type>{{type}}</span>
+            <span class="qb-feature-badge" data-feature-rating>{{rating}}</span>
+            <button type="button" class="qb-secondary" data-app-action="edit-catalog-override" aria-label="Configure {{name}}">Configure</button>
+            <button type="button" class="qb-secondary" data-app-action="remove-row" aria-label="Remove {{name}}">Remove</button>
+          </fieldset>
+        {{else}}
+          <p class="qb-muted" data-catalog-empty>No feature changes have been added.</p>
+        {{/each}}
+      </div>
+      <div class="qb-dialog-actions qb-dialog-wide">
+        <button type="button" class="qb-primary" data-app-action="add-override">Add feature change</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="qb-config-dialog" data-catalog-edit-dialog aria-labelledby="qb-catalog-edit-title">
+    <div class="qb-dialog-content">
+      <div class="qb-section-heading qb-dialog-wide">
+        <h2 id="qb-catalog-edit-title" data-catalog-dialog-title>Configure feature</h2>
+        <button type="button" class="qb-secondary" data-app-action="cancel-catalog-dialog" aria-label="Close feature configuration">Close</button>
+      </div>
+      <label class="qb-field qb-dialog-wide"><span>Feature name</span><input data-catalog-dialog-field="name" type="text" required /></label>
+      <label class="qb-field qb-dialog-wide"><span>Description override</span><textarea data-catalog-dialog-field="description" rows="3"></textarea></label>
+      <label class="qb-field">
+        <span>Type</span>
+        <select data-catalog-dialog-field="type">
+          <option value="Passive">Passive</option>
+          <option value="Active">Active</option>
+        </select>
+      </label>
+      <label class="qb-field">
+        <span>Rating</span>
+        <select data-catalog-dialog-field="rating">
+          <option value="Low">Low (+1)</option>
+          <option value="Medium">Medium (+2)</option>
+          <option value="High">High (+3)</option>
+        </select>
+      </label>
+      <label class="qb-field"><span>Passive bonus override</span><input data-catalog-dialog-field="bonus" type="number" /></label>
+      <label class="qb-field"><span>Bonus per active use override</span><input data-catalog-dialog-field="bonusPerUse" type="number" /></label>
+      <label class="qb-checkbox-field qb-dialog-wide"><input data-catalog-dialog-field="disabled" type="checkbox" /> Disable this catalog entry</label>
+      <div class="qb-dialog-actions qb-dialog-wide">
+        <button type="button" class="qb-secondary" data-app-action="cancel-catalog-dialog">Cancel</button>
+        <button type="button" class="qb-primary" data-app-action="save-catalog-dialog">Save feature</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog class="qb-config-dialog" data-encounter-dialog aria-labelledby="qb-encounter-dialog-title">
     <div class="qb-dialog-content">
