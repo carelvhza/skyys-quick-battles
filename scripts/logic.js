@@ -107,6 +107,19 @@ export function mergeCatalog(baseCatalog, overrides = []) {
   return [...entries.values()];
 }
 
+export function reassignEncounterGroup(encounters, removedGroupId, replacementGroupId) {
+  if (!replacementGroupId) throw new Error("A remaining encounter group is required.");
+  return encounters.map((encounter) => {
+    if (!Array.isArray(encounter.groups) || !encounter.groups.includes(removedGroupId)) return encounter;
+    return {
+      ...encounter,
+      groups: [...new Set(encounter.groups.map((groupId) => (
+        groupId === removedGroupId ? replacementGroupId : groupId
+      )))]
+    };
+  });
+}
+
 export function highestAbility(abilities = {}) {
   return ABILITY_ORDER.reduce(
     (best, key) => {
