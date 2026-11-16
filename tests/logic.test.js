@@ -42,6 +42,27 @@ test("Foundry V14 application implements the Handlebars rendering contract", () 
   assert.match(applicationSource, /application\.render\(\{ force: true \}\)/);
 });
 
+test("Quick Battle chat commands use Foundry V14's ChatLog command registry", () => {
+  assert.match(applicationSource, /const QUICK_BATTLE_CHAT_COMMANDS = \["quickbattle", "quickbattles"\]/);
+  assert.match(applicationSource, /const commands = ui\.chat\?\.constructor\?\.CHAT_COMMANDS/);
+  assert.ok(applicationSource.includes('rgx: new RegExp(`^\\\\/${command}\\\\s*$`, "i")'));
+  assert.match(applicationSource, /fn: openQuickBattles/);
+  assert.match(applicationSource, /function openQuickBattles\(\) \{\s*if \(!game\.user\.isGM\)/);
+  assert.match(applicationSource, /registerQuickBattleChatCommands\(\);/);
+  assert.doesNotMatch(applicationSource, /Hooks\.on\("chatMessage"/);
+  for (const command of ["quickbattle", "quickbattles"]) {
+    const pattern = new RegExp(`^\\/${command}\\s*$`, "i");
+    assert.equal(pattern.test(`/${command}`), true);
+    assert.equal(pattern.test(`/${command.toUpperCase()} `), true);
+  }
+});
+
+test("Quick Battle is a GM-only Token Controls button for the shared application action", () => {
+  assert.match(applicationSource, /Hooks\.on\("getSceneControlButtons", addQuickBattleTokenControl\)/);
+  assert.match(applicationSource, /function addQuickBattleTokenControl\(controls\) \{\s*const tokenControl = controls\.tokens;/);
+  assert.match(applicationSource, /tokenControl\.tools\.quickbattles = \{[\s\S]*?icon: "fa-solid fa-swords"[\s\S]*?button: true,[\s\S]*?visible: game\.user\.isGM,[\s\S]*?if \(active\) openQuickBattles\(\);/);
+});
+
 test("configuration is available through a structured Foundry settings menu", () => {
   assert.match(applicationSource, /game\.settings\.registerMenu\(MODULE_ID, "configurationMenu"/);
   assert.match(applicationSource, /game\.settings\.register\(MODULE_ID, "configuration", \{[\s\S]*?scope: "world"/);
