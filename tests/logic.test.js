@@ -231,21 +231,42 @@ test("the supplied feat catalog is parsed in full, including semicolon-containin
 test("only catalogued actor items contribute passive bonuses or selectable active uses", () => {
   const catalog = [
     { name: "Alert", type: "Passive", bonus: 3 },
-    { name: "Lucky", type: "Active", bonus: 1, bonusPerUse: 1 }
+    { name: "Lucky", type: "Active", bonus: 1, bonusPerUse: 1 },
+    { name: "Lay on Hands", type: "Active", bonus: 2, bonusPerUse: 2 }
   ];
   const items = [
     { id: "alert", name: "Alert", system: {} },
     { id: "lucky", name: "Lucky", system: { uses: { max: 3, value: 2 } } },
+    { id: "lay-on-hands", name: "Lay on Hands", system: { uses: { max: 60, value: 60 } } },
     { id: "unknown", name: "Unknown", system: {} }
   ];
   const bonuses = selectedCatalogBonuses(catalog, items);
   assert.equal(bonuses.passiveBonus, 3);
   assert.deepEqual(bonuses.passiveEntries, [{ name: "Alert", bonus: 3 }]);
-  assert.equal(bonuses.activeEntries.length, 1);
+  assert.equal(bonuses.activeEntries.length, 2);
   assert.equal(bonuses.activeEntries[0].available, 2);
+  assert.deepEqual(
+    (({ name, bonusPerUse, available, resourceCostPerUse, resourceAvailable }) => (
+      { name, bonusPerUse, available, resourceCostPerUse, resourceAvailable }
+    ))(bonuses.activeEntries[1]),
+    {
+      name: "Lay on Hands",
+      bonusPerUse: 1,
+      available: 3,
+      resourceCostPerUse: 20,
+      resourceAvailable: 60
+    }
+  );
+  assert.equal(resourceBonus([{ count: 3, bonusPerUse: bonuses.activeEntries[1].bonusPerUse }]), 3);
+  assert.match(mainTemplate, /resourceAvailable\}\}\/\{\{resourceCostPerUse/);
+  assert.match(applicationSource, /const resourceCount = count \* \(option\.resourceCostPerUse \?\? 1\)/);
+  const partiallySpent = selectedCatalogBonuses(catalog, [
+    { id: "lay-on-hands", name: "Lay on Hands", system: { uses: { max: 60, value: 59 } } }
+  ]);
+  assert.equal(partiallySpent.activeEntries[0].available, 2);
 });
 
-test("passive bonus calculation uses first ability on ties and includes all configured components", () => {
+test("passive bonus calculation uses only the highest ability and other configured components", () => {
   const passive = calculatePassiveBonuses({
     abilities: { str: { mod: 3 }, dex: { mod: 3 }, int: { mod: 1 }, wis: { mod: 0 }, cha: { mod: 3 } },
     currentHp: 99,
@@ -255,11 +276,10 @@ test("passive bonus calculation uses first ability on ties and includes all conf
   assert.deepEqual(passive, {
     ability: 3,
     abilityName: "STR",
-    charisma: 2,
     hp: 1,
     armor: 2,
     catalog: 4,
-    total: 12
+    total: 10
   });
 });
 

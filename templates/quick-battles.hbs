@@ -13,7 +13,6 @@
         <h3>Passive bonuses</h3>
         <dl class="qb-bonus-list">
           <div><dt>Highest ability ({{passive.abilityName}})</dt><dd>{{signed passive.ability}}</dd></div>
-          <div><dt>Charisma</dt><dd>{{signed passive.charisma}}</dd></div>
           <div><dt>Current HP</dt><dd>{{signed passive.hp}}</dd></div>
           <div><dt>Armor class</dt><dd>{{signed passive.armor}}</dd></div>
           {{#each passiveEntries}}
@@ -34,7 +33,7 @@
           <div class="qb-resource-list">
             {{#each activeItems}}
               <label class="qb-resource-row">
-                <span>{{name}} <small>+{{bonusPerUse}} each · {{available}} available</small></span>
+                <span>{{name}} <small>+{{bonusPerUse}} each · {{#if resourceCostPerUse}}{{available}} ({{resourceAvailable}}/{{resourceCostPerUse}}){{else}}{{available}}{{/if}} available</small></span>
                 <input name="active-{{itemId}}" type="number" min="0" max="{{available}}" value="0" data-bonus-count data-bonus-per-use="{{bonusPerUse}}" />
               </label>
             {{/each}}
@@ -121,7 +120,7 @@
                 <span class="qb-eyebrow">Begin a journey</span>
                 <h2>Fate check</h2>
               </div>
-              <span class="qb-stage-badge">New run</span>
+              {{!-- <span class="qb-stage-badge">New run</span> --}}
             </header>
             <p class="qb-muted">A single d20 determines whether a threat finds the party. Apply pace, camp, and situational modifiers below.</p>
             <form class="qb-fate-form">
@@ -165,7 +164,7 @@
           <section class="qb-section qb-encounter-section">
             <header class="qb-section-heading">
               <div>
-                <span class="qb-eyebrow">Choose your opposition</span>
+                <span class="qb-eyebrow">Choose encounter</span>
                 <h2>Encounter</h2>
               </div>
               <span class="qb-stage-badge">01</span>

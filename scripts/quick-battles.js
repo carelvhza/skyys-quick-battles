@@ -1255,7 +1255,13 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     const expected = payload.preview;
     const activeItems = expected.activeItems.map((option) => {
       const item = actor.items.get(option.itemId);
-      return { ...option, available: itemUses(item).available };
+      const resourceAvailable = itemUses(item).available;
+      const resourceCostPerUse = option.resourceCostPerUse ?? 1;
+      return {
+        ...option,
+        available: Math.floor(resourceAvailable / resourceCostPerUse),
+        ...(option.resourceCostPerUse ? { resourceAvailable } : {})
+      };
     }).filter((option) => option.available > 0);
     const currentSpellSlots = availableSpellSlots(actor.system?.spells);
     const spellSlots = expected.spellSlots.flatMap((slot) => {
@@ -1436,7 +1442,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     await persistRun(current.run, current.message);
     await ChatMessage.create({
       content: chatCard(
-        `<header><div><span class="qb-eyebrow">Encounter selected</span><h3>${escapeHtml(selected.name)}</h3></div><span class="qb-encounter-difficulty">${escapeHtml(current.run.selectedEncounter.difficultyLabel)} · DC ${escapeHtml(current.run.selectedEncounter.dc)}</span></header><p>${escapeHtml(selected.description ?? "")}</p>`,
+        `<header><div><span class="qb-eyebrow">Encounter</span><h3>${escapeHtml(selected.name)}</h3></div><span class="qb-encounter-difficulty">${escapeHtml(current.run.selectedEncounter.difficultyLabel)} DC ${escapeHtml(current.run.selectedEncounter.dc)}</span></header><p>${escapeHtml(selected.description ?? "")}</p>`,
         "qb-encounter-card"
       ),
       flags: {
@@ -1607,10 +1613,11 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
 
       const item = actor.items.get(option.itemId);
       const current = itemUses(item);
-      if (!item || count > current.available) throw new Error(`${option.name} no longer has enough uses available.`);
+      const resourceCount = count * (option.resourceCostPerUse ?? 1);
+      if (!item || resourceCount > current.available) throw new Error(`${option.name} no longer has enough uses available.`);
       const updateValue = current.updatePath === "system.uses.spent"
-        ? current.current + count
-        : current.current - count;
+        ? current.current + resourceCount
+        : current.current - resourceCount;
       updates.push({ _id: item.id, [current.updatePath]: updateValue });
       const itemBonus = count * option.bonusPerUse;
       bonus += itemBonus;
@@ -1645,7 +1652,6 @@ function renderParticipantResult(details, damageApplied) {
   const signed = (value) => `${Number(value) >= 0 ? "+" : ""}${Number(value) || 0}`;
   const passiveBreakdown = [
     `${details.passive.abilityName} ${signed(details.passive.ability)}`,
-    `CHA ${signed(details.passive.charisma)}`,
     `HP ${signed(details.passive.hp)}`,
     `AC ${signed(details.passive.armor)}`,
     ...details.passiveEntries.map((entry) => `${escapeHtml(entry.name)} ${signed(entry.bonus)}`)
@@ -1688,10 +1694,9 @@ async function submitFateRoll(runId, requestId, userId) {
   try {
     const roll = await nativeD20(null, 0, "Quick Battles Fate d20");
     if (!roll) return;
-    await ChatMessage.create({
-      content: `<p>Fate d20: ${roll.total}</p>`,
+    await roll.toMessage({
+      flavor: "Quick Battles Fate d20",
       whisper: [...new Set([...gmUserIds(), game.user.id])],
-      rolls: [roll],
       flags: { [MODULE_ID]: { type: "fate-submission", runId, requestId, userId: game.user.id } }
     });
   } finally {
