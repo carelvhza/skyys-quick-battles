@@ -19,6 +19,7 @@ import {
   reassignEncounterGroup,
   selectedCatalogBonuses,
   spellSlotBonus,
+  spellSlotSpendPlan,
   submittedRollTotal
 } from "../scripts/logic.js";
 
@@ -306,10 +307,86 @@ test("spell slot levels include used capacity but hide levels with no capacity",
       spell4: { value: 1, override: 1 }
     }, { 1: 1, 2: 1, 4: 2 }),
     [
-      { level: 1, capacity: 2, available: 0, bonus: 1 },
-      { level: 2, capacity: 2, available: 1, bonus: 1 },
-      { level: 4, capacity: 1, available: 1, bonus: 2 }
+      {
+        level: 1,
+        capacity: 2,
+        available: 0,
+        bonus: 1,
+        resources: [{ key: "spell1", capacity: 2, current: 0, available: 0 }]
+      },
+      {
+        level: 2,
+        capacity: 2,
+        available: 1,
+        bonus: 1,
+        resources: [{ key: "spell2", capacity: 2, current: 1, available: 1 }]
+      },
+      {
+        level: 4,
+        capacity: 1,
+        available: 1,
+        bonus: 2,
+        resources: [{ key: "spell4", capacity: 1, current: 1, available: 1 }]
+      }
     ]
+  );
+});
+
+test("Warlock pact slots appear at their pact level with configured bonuses, including when spent", () => {
+  const slots = availableSpellSlots({
+    spell2: { value: 1, max: 1 },
+    pact: { value: 0, max: 2, level: 5 }
+  }, { 2: 3, 5: 9 });
+  assert.deepEqual(slots, [
+    {
+      level: 2,
+      capacity: 1,
+      available: 1,
+      bonus: 3,
+      resources: [{ key: "spell2", capacity: 1, current: 1, available: 1 }]
+    },
+    {
+      level: 5,
+      capacity: 2,
+      available: 0,
+      bonus: 9,
+      resources: [{ key: "pact", capacity: 2, current: 0, available: 0 }]
+    }
+  ]);
+});
+
+test("spell-slot spending consumes ordinary and pact slots and preserves configured bonus values", async () => {
+  const actor = {
+    system: {
+      spells: {
+        spell3: { value: 1, max: 1 },
+        pact: { value: 2, max: 2, level: 3 }
+      }
+    },
+    async update(updates) {
+      for (const [path, value] of Object.entries(updates)) {
+        const parts = path.split(".");
+        const key = parts.pop();
+        parts.reduce((object, part) => object[part], this)[key] = value;
+      }
+    }
+  };
+  const plan = spellSlotSpendPlan(actor.system.spells, { 3: 2 }, { 3: 7 });
+
+  assert.deepEqual(plan, {
+    spends: { 3: 2 },
+    updates: {
+      "system.spells.spell3.value": 0,
+      "system.spells.pact.value": 1
+    },
+    bonus: 14
+  });
+  await applyResourceUpdates(actor, [], plan.updates);
+  assert.equal(actor.system.spells.spell3.value, 0);
+  assert.equal(actor.system.spells.pact.value, 1);
+  assert.throws(
+    () => spellSlotSpendPlan(actor.system.spells, { 3: 3 }, { 3: 7 }),
+    /Not enough level 3 spell slots remain/
   );
 });
 
