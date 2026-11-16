@@ -181,18 +181,90 @@ export function spellSlotBonus(spends, bonusesByLevel = {}) {
 }
 
 export function availableSpellSlots(spells = {}, bonusesByLevel = {}) {
-  return Array.from({ length: 9 }, (_, index) => {
+  const slots = Array.from({ length: 9 }, (_, index) => {
     const level = index + 1;
-    const slot = spells[`spell${level}`];
+    const key = `spell${level}`;
+    const slot = spells[key];
     const capacity = Math.max(0, finiteNumber(slot?.max ?? slot?.override, 0));
     if (capacity === 0) return null;
     return {
       level,
       capacity,
       available: Math.min(capacity, Math.max(0, finiteNumber(slot?.value, 0))),
-      bonus: finiteNumber(bonusesByLevel[level], 0)
+      bonus: finiteNumber(bonusesByLevel[level], 0),
+      resources: [{
+        key,
+        capacity,
+        current: Math.max(0, finiteNumber(slot?.value, 0)),
+        available: Math.min(capacity, Math.max(0, finiteNumber(slot?.value, 0)))
+      }]
     };
   }).filter(Boolean);
+
+  const pact = spells.pact;
+  const pactLevel = Math.floor(finiteNumber(pact?.level, 0));
+  const pactCapacity = Math.max(0, finiteNumber(pact?.max ?? pact?.override, 0));
+  if (pactLevel >= 1 && pactLevel <= 9 && pactCapacity > 0) {
+    let slot = slots.find((entry) => entry.level === pactLevel);
+    if (!slot) {
+      slot = {
+        level: pactLevel,
+        capacity: 0,
+        available: 0,
+        bonus: finiteNumber(bonusesByLevel[pactLevel], 0),
+        resources: []
+      };
+      slots.push(slot);
+    }
+    const current = Math.max(0, finiteNumber(pact.value, 0));
+    const available = Math.min(pactCapacity, current);
+    slot.capacity += pactCapacity;
+    slot.available += available;
+    slot.resources.push({
+      key: "pact",
+      capacity: pactCapacity,
+      current,
+      available
+    });
+  }
+
+  return slots.sort((left, right) => left.level - right.level);
+}
+
+export function spellSlotSpendPlan(spells = {}, spends = {}, bonusesByLevel = {}) {
+  const availableByLevel = new Map(availableSpellSlots(spells).map((slot) => [slot.level, slot]));
+  const updates = {};
+  const validSpends = {};
+
+  for (const [rawLevel, rawCount] of Object.entries(spends)) {
+    const level = Number(rawLevel);
+    const count = Number(rawCount);
+    if (!Number.isInteger(level) || level < 1 || level > 9 || !Number.isInteger(count) || count < 0) {
+      throw new Error("Spell-slot spends must use whole-number levels and counts.");
+    }
+    if (count === 0) continue;
+
+    const slot = availableByLevel.get(level);
+    if (!slot || count > slot.available) {
+      throw new Error(`Not enough level ${level} spell slots remain.`);
+    }
+
+    let remaining = count;
+    for (const resource of slot.resources) {
+      const spent = Math.min(remaining, resource.available);
+      if (spent === 0) continue;
+      updates[`system.spells.${resource.key}.value`] = resource.current - spent;
+      remaining -= spent;
+    }
+    if (remaining > 0) throw new Error(`Not enough level ${level} spell slots remain.`);
+    validSpends[level] = count;
+  }
+
+  return {
+    spends: validSpends,
+    updates,
+    bonus: spellSlotBonus(validSpends, bonusesByLevel)
+  };
 }
 
 export function resourceBonus(entries = []) {

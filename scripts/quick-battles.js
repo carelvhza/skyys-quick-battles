@@ -15,7 +15,7 @@ import {
   reassignEncounterGroup,
   resourceBonus,
   selectedCatalogBonuses,
-  spellSlotBonus,
+  spellSlotSpendPlan,
   submittedRollTotal
 } from "./logic.js";
 
@@ -1627,21 +1627,15 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
 
   _slotSpendPlan(actor, slots, bonusesByLevel) {
     const spends = {};
-    const updates = {};
     for (const slot of slots) {
       const input = this.element.querySelector(`[name="slot-${slot.level}"]`);
       const rawCount = numberValue(input?.value ?? 0, `Level ${slot.level} spell slots`);
       if (!Number.isInteger(rawCount)) throw new Error(`Level ${slot.level} spell slots must be a whole number.`);
       const count = rawCount;
       if (count < 0 || count > slot.available) throw new Error(`Invalid number of level ${slot.level} spell slots.`);
-      if (count === 0) continue;
-      const key = `spell${slot.level}`;
-      const current = Math.max(0, Number(actor.system?.spells?.[key]?.value) || 0);
-      if (count > current) throw new Error(`Not enough level ${slot.level} spell slots remain.`);
-      spends[slot.level] = count;
-      updates[`system.spells.${key}.value`] = current - count;
+      if (count > 0) spends[slot.level] = count;
     }
-    return { spends, updates, bonus: spellSlotBonus(spends, bonusesByLevel) };
+    return spellSlotSpendPlan(actor.system?.spells, spends, bonusesByLevel);
   }
 }
 
