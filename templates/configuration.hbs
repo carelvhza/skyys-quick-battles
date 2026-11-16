@@ -22,7 +22,7 @@
               </label>
               <label class="qb-field qb-actor-field">
                 <span>Player actor</span>
-                <select data-field="actorUuid" data-actor-selector size="{{actorListSize}}" required>
+                <select data-field="actorUuid" data-actor-selector required>
                   <option value="">Select an actor</option>
                   {{#each actors}}<option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
                 </select>

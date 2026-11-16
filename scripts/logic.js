@@ -132,17 +132,15 @@ export function highestAbility(abilities = {}) {
 
 export function calculatePassiveBonuses({ abilities = {}, currentHp = 0, ac = 0, catalogBonus = 0 } = {}) {
   const bestAbility = highestAbility(abilities);
-  const charismaModifier = finiteNumber(abilities.cha?.mod ?? abilities.cha, 0);
   const armorClass = finiteNumber(ac, 0);
   const bonuses = {
     ability: bestAbility.modifier,
     abilityName: bestAbility.key.toUpperCase(),
-    charisma: Math.ceil(charismaModifier / 2),
     hp: Math.floor(finiteNumber(currentHp, 0) / 50),
     armor: armorClass >= 22 ? 2 : armorClass >= 19 ? 1 : 0,
     catalog: finiteNumber(catalogBonus, 0)
   };
-  bonuses.total = bonuses.ability + bonuses.charisma + bonuses.hp + bonuses.armor + bonuses.catalog;
+  bonuses.total = bonuses.ability + bonuses.hp + bonuses.armor + bonuses.catalog;
   return bonuses;
 }
 
@@ -311,11 +309,15 @@ export function selectedCatalogBonuses(catalog, actorItems) {
     }
 
     const uses = itemUses(item);
-    if (uses.available > 0) {
+    const isLayOnHands = entry.name.toLocaleLowerCase() === "lay on hands";
+    const resourceCostPerUse = isLayOnHands ? 20 : 1;
+    const available = Math.floor(uses.available / resourceCostPerUse);
+    if (available > 0) {
       activeEntries.push({
         name: entry.name,
-        bonusPerUse: finiteNumber(entry.bonusPerUse ?? entry.bonus),
-        available: uses.available,
+        bonusPerUse: isLayOnHands ? 1 : finiteNumber(entry.bonusPerUse ?? entry.bonus),
+        available,
+        ...(isLayOnHands ? { resourceCostPerUse, resourceAvailable: uses.available } : {}),
         updatePath: uses.updatePath,
         current: uses.current,
         itemId: item.id

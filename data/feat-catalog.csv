@@ -6,9 +6,9 @@ Agonizing Blast (Eldritch Invocation), Passive, High, Add Charisma modifier to d
 Alchemical Savant (Alchemist), Passive, Low, Add INT modifier to damage or healing rolls of spells using alchemist's supplies, Artificer
 Alert, Passive, High, +5 to initiative; immune to surprise while conscious; no advantage for hidden attackers, Feat
 Aura of Conquest (Conquest), Passive, High, Frightened enemies within 10ft have speed 0 and take psychic damage equal to half Paladin level, Paladin
-Aura of Courage, Passive, Medium, Allies within 10ft (30ft at level 18) cannot be Frightened while Paladin is conscious, Paladin
+Aura of Courage, Passive, Low, Allies within 10ft (30ft at level 18) cannot be Frightened while Paladin is conscious, Paladin
 Aura of Devotion (Devotion), Passive, Medium, Allies within 10ft cannot be Charmed, Paladin
-Aura of Protection, Passive, High, Allies within 10ft (30ft at level 18) add Paladin's CHA modifier to all saving throws while conscious, Paladin
+Aura of Protection, Passive, Medium, Allies within 10ft (30ft at level 18) add Paladin's CHA modifier to all saving throws while conscious, Paladin
 Aura of Warding (Ancients), Passive, High, Paladin and allies within 10ft have resistance to damage from spells, Paladin
 Arcane Abeyance (Chronurgy), Active, High, Freeze 4th or lower level spell into bead for 1 hour; any creature holding bead can cast spell using Action, Wizard
 Arcane Armor (Armorer), Passive, High, Turn heavy armor into power armor (Guardian for Temp HP + taunt punch or Infiltrator for 1d6 lightning + speed), Artificer
@@ -27,7 +27,7 @@ Assassinate (Assassin), Passive, High, Advantage on attack rolls vs creatures th
 Athlete, Passive, Low, Reduced movement cost for standing/climbing; jumping bonuses, Feat
 Awakened Mind (Great Old One), Passive, Low, Telepathically speak to any creature within 30ft that understands at least one language, Warlock
 Balm of Peace (Peace), Active, High, Channel Divinity to move speed without provoking opportunity attacks and heal 2d6+WIS to adjacent allies, Cleric
-Bardic Inspiration, Active, Medium, Bonus Action to give ally die (d6-d12) to add to attack ability check or saving throw, Bard
+Bardic Inspiration, Active, Low, Bonus Action to give ally die (d6-d12) to add to attack ability check or saving throw, Bard
 Battle Ready (Battle Smith), Passive, High, Gain martial weapon proficiency; use INT modifier for attack and damage rolls with magic weapons, Artificer
 Beast Spells, Passive, High, Cast spells while transformed in Wild Shape (somatic and verbal components), Druid
 Beguiling Defenses (Archfey), Passive, Low, Immunity to Charmed; Reaction when enemy tries to charm you to turn charm back on caster, Warlock
@@ -58,7 +58,7 @@ Companion's Bond / Primal Companion (Beast Master), Passive, Medium, Command bea
 Controlled Chaos (Wild Magic), Passive, Low, Roll twice on Wild Magic Surge table and choose which effect occurs, Sorcerer
 Convergent Future (Chronurgy), Active, High, Reaction to force success or failure on a save check or attack roll; gain 1 level of exhaustion, Wizard
 Countercharm, Active, Low, Action to grant allies within 30ft advantage on saves against Frightened and Charmed, Bard
-Crossbow Expert, Passive, High, Ignore loading property; no disadvantage on ranged attacks in 5ft; Bonus Action hand crossbow attack, Feat
+Crossbow Expert, Passive, Medium, Ignore loading property; no disadvantage on ranged attacks in 5ft; Bonus Action hand crossbow attack, Feat
 Crusher, Passive, High, Once per turn push enemy 5ft on bludgeoning hit; critical hit grants attack advantage to all allies until next turn, Feat
 Cunning Action, Passive, High, Bonus Action to Dash Disengage or Hide at will, Rogue
 Cutting Words (Lore), Passive, High, Reaction to subtract Bardic Inspiration die from enemy attack roll damage roll or ability check, Bard
@@ -114,9 +114,9 @@ Evasion, Passive, High, DEX saves vs AoE effects take half damage on fail and 0 
 Experimental Elixir (Alchemist), Active, Low, Create random/chosen elixirs on long rest or for 1st level slot (Healing Swiftness Resilience Boldness Flight), Artificer
 Expert Divination (Divination), Passive, Medium, Casting 2nd+ level Divination spell restores lower-level spell slot, Wizard
 Extended Spell (Metamagic), Passive, Low, Spend 1 point to double spell duration (up to 24 hours), Sorcerer
-Extra Attack (2), Passive, High, Attack 3 times with the Attack action on your turn, Fighter
-Extra Attack (3), Passive, High, Attack 4 times with the Attack action on your turn, Fighter
-Extra Attack, Passive, High, Attack twice instead of once when taking Attack action on your turn, Fighter
+Extra Attack (2), Passive, Medium, Attack 3 times with the Attack action on your turn, Fighter
+Extra Attack (3), Passive, Medium, Attack 4 times with the Attack action on your turn, Fighter
+Extra Attack, Passive, Medium, Attack twice instead of once when taking Attack action on your turn, Fighter
 Eyes of the Dark (Shadow), Active, Medium, 120ft Darkvision; spend 2 Sorcery Points to cast Darkness that you can see through, Sorcerer
 Eyes of the Grave (Grave), Passive, Low, Action to sense location of undead within 60ft at will, Cleric
 Fade Away, Active, Medium, Reaction when taking damage to turn invisible until end of next turn (1/short or long rest), Feat
@@ -125,7 +125,7 @@ Fast Hands (Thief), Passive, Medium, Bonus Action to make DEX (Sleight of Hand) 
 Fast Movement, Passive, Low, +10ft movement speed while not wearing heavy armor, Barbarian
 Favored Enemy / Favored Foe, Passive, Low, Advantage on tracking/survival checks; TCoE Favored Foe adds concentration 1d4-1d8 damage on hit, Ranger
 Favored by the Gods (Divine Soul), Active, Medium, Add 2d4 to failed saving throw or missed attack roll once per short/long rest, Sorcerer
-Feral Instinct, Passive, High, Advantage on initiative rolls; act normally on first turn if surprised by entering Rage, Barbarian
+Feral Instinct, Passive, Low, Advantage on initiative rolls; act normally on first turn if surprised by entering Rage, Barbarian
 Feral Senses, Passive, Medium, Attack unseen targets without disadvantage; aware of invisible targets within 30ft, Ranger
 Fey Presence (Archfey), Active, Low, Action to force 10ft cube to save vs WIS or become Charmed or Frightened until end of next turn, Warlock
 Fey Teleportation, Active, Medium, Cast Misty Step once per short/long rest without expending a spell slot, Feat
@@ -172,7 +172,7 @@ Hurl Through Hell (Fiend), Active, High, Once per long rest on hit vanish target
 Hypnotic Gaze (Enchantment), Passive, Low, Action to daze target within 5ft (WIS save or Incapacitated and speed 0 on subsequent turns), Wizard
 Improved Abjuration (Abjuration), Passive, High, Add proficiency bonus to Counterspell and Dispel Magic ability checks, Wizard
 Improved Critical (Champion), Passive, Medium, Weapon attacks score a critical hit on a roll of 19 or 20, Fighter
-Improved Divine Smite, Passive, High, All melee weapon hits automatically deal an extra 1d8 radiant damage, Paladin
+Improved Divine Smite, Passive, Medium, All melee weapon hits automatically deal an extra 1d8 radiant damage, Paladin
 Indomitable, Active, Medium, Reroll a failed saving throw once (up to 3 times) per long rest, Fighter
 Indomitable Might, Passive, Low, Use STR score in place of total if STR check roll is lower than STR score, Barbarian
 Infernal Constitution, Passive, Medium, Cold and Poison damage resistance; advantage on saving throws against poison, Feat
@@ -184,7 +184,6 @@ Interception (Fighting Style), Passive, Medium, Reaction to reduce attack damage
 Inured to Undeath (Necromancy), Passive, Low, Resistance to necrotic damage; max HP cannot be reduced, Wizard
 Invoke Duplicity (Trickery), Active, Medium, Channel Divinity to create illusionary duplicate for spell origin and attack advantage, Cleric
 Iron Mind (Gloom Stalker), Passive, Medium, Gain proficiency in Wisdom saving throws, Ranger
-Jack of All Trades, Passive, Low, Add half proficiency bonus to any ability check that doesn't already use proficiency, Bard
 Ki / Dedicated Weapon, Active, High, Expend Ki points to fuel Flurry of Blows Patient Defense Step of the Wind or stunning strikes, Monk
 Ki-Empowered Strikes, Passive, Medium, Unarmed strikes count as magical for overcoming resistances, Monk
 Know Your Enemy (Battle Master), Passive, Low, Observe target for 1 minute to learn combat capabilities relative to yourself, Fighter
@@ -198,7 +197,6 @@ Magic Item Attunement, Passive, Medium, Attune to up to 6 magic items simultaneo
 Magic-User's Nemesis (Monster Slayer), Active, Medium, Reaction to foil spellcast or teleportation within 60ft (WIS save or fails and spell is wasted), Ranger
 Magical Ambush (Arcane Trickster), Passive, High, Target has disadvantage on saving throws vs your spells if you are hidden when casting, Rogue
 Magical Guidance (TCoE), Active, Low, Spend 1 Sorcery Point to reroll failed ability check, Sorcerer
-Magical Secrets, Passive, High, Learn 2 spells of any level/class list to count as Bard spells, Bard
 Magical Tinkering, Passive, Low, Action to touch tiny nonmagical object to grant light sound odor or visual effect at will, Artificer
 Mantle of Inspiration (Glamour), Active, High, Bonus Action to spend Bardic Inspiration giving allies Temp HP and immediate Reaction movement, Bard
 Martial Adept, Active, Low, Gain 1 Superiority Die (d6) to use 2 Battle Master Maneuvers per short/long rest, Feat
@@ -253,11 +251,11 @@ Purity of Body, Passive, Low, Immunity to poison damage and the Poisoned conditi
 Quickened Spell (Metamagic), Passive, High, Spend 2 points to change spell casting time from 1 Action to 1 Bonus Action, Sorcerer
 Quivering Palm (Open Hand), Active, High, Spend 3 Ki on hit to set up lethal vibrations; Action later to force CON save (0 HP on fail 10d10 on success), Monk
 Radiance of the Dawn (Light), Active, High, Channel Divinity to dispel magical darkness and deal 2d10 + level radiant damage in 30ft sphere, Cleric
-Rage, Active, High, Bonus Action to enter Rage: advantage on STR checks/saves resistance to physical damage melee STR bonus damage, Barbarian
+Rage, Active, Medium, Bonus Action to enter Rage: advantage on STR checks/saves resistance to physical damage melee STR bonus damage, Barbarian
 Rage Beyond Death (Zealot), Passive, High, Taking damage at 0 HP does not knock you unconscious while raging until rage ends, Barbarian
 Rakish Audacity (Swashbuckler), Passive, High, Add CHA modifier to initiative; trigger Sneak Attack without advantage if within 5ft of target, Rogue
 Rapid Strike (Samurai), Passive, High, Forgo advantage on one attack to make one additional weapon attack as part of Attack action, Fighter
-Reckless Attack, Passive, High, First attack on turn gains advantage; enemy attacks against you gain advantage until next turn, Barbarian
+Reckless Attack, Passive, Medium, First attack on turn gains advantage; enemy attacks against you gain advantage until next turn, Barbarian
 Relentless (Battle Master), Passive, Low, Regain 1 Superiority Die when initiating combat with 0 remaining, Fighter
 Relentless Avenger (Vengeance), Passive, Low, Move up to half speed as part of opportunity attack without provoking opportunity attacks, Paladin
 Relentless Rage, Active, High, DC 10 CON save (increases by 5 per check) to drop to 1 HP instead of 0 HP while raging, Barbarian
@@ -368,7 +366,7 @@ Weapon Master, Passive, Low, Proficiency with 4 chosen martial/simple weapons, F
 Wholeness of Body (Open Hand), Active, Low, Action to regain HP equal to 3 x Monk level once per long rest, Monk
 Wild Companion, Active, Low, Spend 1 Wild Shape use to cast Find Familiar without material components, Druid
 Wild Magic Surge (Wild Magic), Passive, Low, Roll d100 after casting 1st+ level spell to trigger random magical surge table effect, Sorcerer
-Wild Shape, Active, High, Bonus Action or Action to transform into a beast shape gaining physical stats temp HP pool and beast attacks, Druid
+Wild Shape, Active, Medium, Bonus Action or Action to transform into a beast shape gaining physical stats temp HP pool and beast attacks, Druid
 Wild Surge (Wild Magic), Passive, Low, Roll on Wild Magic Surge table upon entering Rage for immediate magical effect, Barbarian
 Wood Elf Magic, Active, Medium, Learn 1 Druid cantrip; cast Longstrider and Pass Without Trace once per long rest, Feat
 Wrath of the Storm (Tempest), Passive, Low, Reaction when hit by melee attack to deal 2d8 lightning/thunder damage (DEX save half), Cleric
