@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  activeUseCount,
   applyResourceUpdates,
   averageRoundedDown,
   availableSpellSlots,
@@ -19,7 +20,9 @@ import {
   reassignEncounterGroup,
   selectedCatalogBonuses,
   spellSlotBonus,
-  submittedRollTotal
+  spellSlotSpendPlan,
+  submittedRollTotal,
+  validateActiveUseLimit
 } from "../scripts/logic.js";
 
 const catalogText = await readFile(new URL("../data/feat-catalog.csv", import.meta.url), "utf8");
@@ -46,6 +49,7 @@ test("configuration is available through a structured Foundry settings menu", ()
   assert.match(configurationTemplate, /data-field="actorUuid"/);
   assert.match(configurationTemplate, /data-config-collection="encounters"/);
   assert.match(configurationTemplate, /data-field="fateDcEasy"/);
+  assert.match(configurationTemplate, /Maximum number of active feats or spells that can be used[\s\S]*data-field="maxActiveUses"/);
   assert.match(configurationTemplate, /data-config-collection="catalogOverrides"/);
   assert.match(applicationSource, /const width = Math\.min\([\s\S]*?viewportWidth \* 0\.7/);
   assert.match(styleSource, /\.qb-config-pair-grid\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
@@ -74,6 +78,18 @@ test("configuration sections use the requested order and encounter details open 
   const positions = sections.map((title) => configurationTemplate.indexOf(`<h2>${title}</h2>`));
   assert.ok(positions.every((position) => position >= 0));
   assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+  assert.match(configurationTemplate, /class="qb-config-top-grid"[\s\S]*Participating Player Actors[\s\S]*role="tablist"[\s\S]*data-config-tab-panel="groups"[\s\S]*data-config-tab-panel="encounters"[\s\S]*data-config-tab-panel="difficulty"/);
+  assert.match(configurationTemplate, /class="qb-config-summary-grid"[\s\S]*Fate and travel[\s\S]*Spell slot bonuses[\s\S]*Results and damage/);
+  assert.match(configurationTemplate, /data-app-action="open-catalog-manager"/);
+  assert.match(configurationTemplate, /data-catalog-manager-dialog/);
+  assert.match(configurationTemplate, /data-catalog-edit-dialog/);
+  assert.match(configurationTemplate, /data-feature-name/);
+  assert.match(configurationTemplate, /data-feature-type/);
+  assert.match(configurationTemplate, /data-feature-rating/);
+  assert.match(configurationTemplate, /data-app-action="edit-catalog-override"/);
+  assert.match(configurationTemplate, /data-catalog-dialog-field="description"/);
+  assert.match(configurationTemplate, /data-catalog-dialog-field="bonusPerUse"/);
+  assert.match(configurationTemplate, /data-catalog-dialog-field="disabled"/);
   assert.match(configurationTemplate, /<dialog[^>]*data-encounter-dialog[^>]*aria-labelledby=/);
   assert.match(configurationTemplate, /data-dialog-field="description"/);
   assert.match(configurationTemplate, /data-dialog-field="difficultyLabel"/);
@@ -83,11 +99,13 @@ test("configuration sections use the requested order and encounter details open 
   assert.match(styleSource, /\.qb-dialog-heading\s*\{\s*grid-column: 1 \/ -1/);
   assert.match(styleSource, /\.qb-dialog-content > \.qb-field\s*\{\s*display: grid/);
   assert.match(configurationTemplate, /data-group-summary/);
-  assert.match(configurationTemplate, /data-field="description" rows="2"/);
+  assert.match(configurationTemplate, /data-field="description" type="hidden"/);
   assert.match(configurationTemplate, /data-field="combat" type="checkbox"/);
   assert.doesNotMatch(configurationTemplate, /type="text" data-field="(?:min|max|dc|combat)"/);
   assert.match(applicationSource, /baseConfig\.catalogOverrides\[index\]/);
   assert.match(applicationSource, /dialog\.showModal\(\)/);
+  assert.match(applicationSource, /_selectConfigurationTab\(tab\)/);
+  assert.match(applicationSource, /activeCatalogIndex/);
 });
 
 test("Quick Battles remembers selections without duplicate main-window configuration", () => {
@@ -104,6 +122,12 @@ test("run recovery is persisted without creating a GM-only run chat card", () =>
   assert.match(applicationSource, /game\.settings\.register\(MODULE_ID, "activeRun", \{[\s\S]*?scope: "world"/);
   assert.match(applicationSource, /game\.settings\.set\(MODULE_ID, "activeRun", JSON\.stringify\(run\)\)/);
   assert.doesNotMatch(applicationSource, /content: `<p>Quick Battles run \$\{escapeHtml\(run\.id\)\}<\/p>`/);
+});
+
+test("older saved configurations inherit the new active-use default", () => {
+  assert.match(applicationSource, /maxActiveUses: 5/);
+  assert.match(applicationSource, /const config = \{\s*\.\.\.clone\(DEFAULT_CONFIG\),\s*\.\.\.candidate/);
+  assert.match(applicationSource, /maxActiveUses: payload\.config\?\.maxActiveUses \?\? 5/);
 });
 
 test("native D20 roll configurations initialize the D&D 5e roll options", () => {
@@ -203,14 +227,17 @@ test("Fate result shows Watch Shift only for camp", () => {
 });
 
 test("participant bonus preview updates from resource-count input changes", () => {
-  assert.match(mainTemplate, /data-active-bonus-preview role="status" aria-live="polite"[\s\S]*data-bonus-total/);
+  assert.match(mainTemplate, /data-active-bonus-preview[^>]*role="status" aria-live="polite"[\s\S]*data-bonus-total/);
   assert.match(mainTemplate, /data-bonus-count data-bonus-per-use=/);
   assert.match(applicationSource, /addEventListener\("input", \(event\) => \{[\s\S]*?updateActiveBonusPreview/);
   assert.match(applicationSource, /preview\.querySelector\("\[data-bonus-total\]"\)\.textContent/);
   assert.match(styleSource, /\.qb-active-bonus-preview\s*\{\s*margin: 0;[\s\S]*justify-content: space-between/);
+  assert.match(mainTemplate, /data-max-active-uses="\{\{maxActiveUses\}\}"[\s\S]*data-active-use-feedback/);
+  assert.match(applicationSource, /maxActiveUses: config\.maxActiveUses/);
+  assert.match(applicationSource, /validateActiveUseLimit\(activePlan\.count/);
 });
 
-test("the supplied feat catalog is parsed in full, including comma-containing descriptions", () => {
+test("the supplied feat catalog is parsed in full, including semicolon-containing descriptions", () => {
   const catalog = parseFeatCatalog(catalogText);
   assert.equal(catalog.length, 374);
   assert.equal(catalog.find((entry) => entry.name === "Actor").bonus, 1);
@@ -221,21 +248,42 @@ test("the supplied feat catalog is parsed in full, including comma-containing de
 test("only catalogued actor items contribute passive bonuses or selectable active uses", () => {
   const catalog = [
     { name: "Alert", type: "Passive", bonus: 3 },
-    { name: "Lucky", type: "Active", bonus: 1, bonusPerUse: 1 }
+    { name: "Lucky", type: "Active", bonus: 1, bonusPerUse: 1 },
+    { name: "Lay on Hands", type: "Active", bonus: 2, bonusPerUse: 2 }
   ];
   const items = [
     { id: "alert", name: "Alert", system: {} },
     { id: "lucky", name: "Lucky", system: { uses: { max: 3, value: 2 } } },
+    { id: "lay-on-hands", name: "Lay on Hands", system: { uses: { max: 60, value: 60 } } },
     { id: "unknown", name: "Unknown", system: {} }
   ];
   const bonuses = selectedCatalogBonuses(catalog, items);
   assert.equal(bonuses.passiveBonus, 3);
   assert.deepEqual(bonuses.passiveEntries, [{ name: "Alert", bonus: 3 }]);
-  assert.equal(bonuses.activeEntries.length, 1);
+  assert.equal(bonuses.activeEntries.length, 2);
   assert.equal(bonuses.activeEntries[0].available, 2);
+  assert.deepEqual(
+    (({ name, bonusPerUse, available, resourceCostPerUse, resourceAvailable }) => (
+      { name, bonusPerUse, available, resourceCostPerUse, resourceAvailable }
+    ))(bonuses.activeEntries[1]),
+    {
+      name: "Lay on Hands",
+      bonusPerUse: 1,
+      available: 3,
+      resourceCostPerUse: 20,
+      resourceAvailable: 60
+    }
+  );
+  assert.equal(resourceBonus([{ count: 3, bonusPerUse: bonuses.activeEntries[1].bonusPerUse }]), 3);
+  assert.match(mainTemplate, /resourceAvailable\}\}\/\{\{resourceCostPerUse/);
+  assert.match(applicationSource, /const resourceCount = count \* \(option\.resourceCostPerUse \?\? 1\)/);
+  const partiallySpent = selectedCatalogBonuses(catalog, [
+    { id: "lay-on-hands", name: "Lay on Hands", system: { uses: { max: 60, value: 59 } } }
+  ]);
+  assert.equal(partiallySpent.activeEntries[0].available, 2);
 });
 
-test("passive bonus calculation uses first ability on ties and includes all configured components", () => {
+test("passive bonus calculation uses only the highest ability and other configured components", () => {
   const passive = calculatePassiveBonuses({
     abilities: { str: { mod: 3 }, dex: { mod: 3 }, int: { mod: 1 }, wis: { mod: 0 }, cha: { mod: 3 } },
     currentHp: 99,
@@ -245,11 +293,10 @@ test("passive bonus calculation uses first ability on ties and includes all conf
   assert.deepEqual(passive, {
     ability: 3,
     abilityName: "STR",
-    charisma: 2,
     hp: 1,
     armor: 2,
     catalog: 4,
-    total: 12
+    total: 10
   });
 });
 
@@ -276,10 +323,86 @@ test("spell slot levels include used capacity but hide levels with no capacity",
       spell4: { value: 1, override: 1 }
     }, { 1: 1, 2: 1, 4: 2 }),
     [
-      { level: 1, capacity: 2, available: 0, bonus: 1 },
-      { level: 2, capacity: 2, available: 1, bonus: 1 },
-      { level: 4, capacity: 1, available: 1, bonus: 2 }
+      {
+        level: 1,
+        capacity: 2,
+        available: 0,
+        bonus: 1,
+        resources: [{ key: "spell1", capacity: 2, current: 0, available: 0 }]
+      },
+      {
+        level: 2,
+        capacity: 2,
+        available: 1,
+        bonus: 1,
+        resources: [{ key: "spell2", capacity: 2, current: 1, available: 1 }]
+      },
+      {
+        level: 4,
+        capacity: 1,
+        available: 1,
+        bonus: 2,
+        resources: [{ key: "spell4", capacity: 1, current: 1, available: 1 }]
+      }
     ]
+  );
+});
+
+test("Warlock pact slots appear at their pact level with configured bonuses, including when spent", () => {
+  const slots = availableSpellSlots({
+    spell2: { value: 1, max: 1 },
+    pact: { value: 0, max: 2, level: 5 }
+  }, { 2: 3, 5: 9 });
+  assert.deepEqual(slots, [
+    {
+      level: 2,
+      capacity: 1,
+      available: 1,
+      bonus: 3,
+      resources: [{ key: "spell2", capacity: 1, current: 1, available: 1 }]
+    },
+    {
+      level: 5,
+      capacity: 2,
+      available: 0,
+      bonus: 9,
+      resources: [{ key: "pact", capacity: 2, current: 0, available: 0 }]
+    }
+  ]);
+});
+
+test("spell-slot spending consumes ordinary and pact slots and preserves configured bonus values", async () => {
+  const actor = {
+    system: {
+      spells: {
+        spell3: { value: 1, max: 1 },
+        pact: { value: 2, max: 2, level: 3 }
+      }
+    },
+    async update(updates) {
+      for (const [path, value] of Object.entries(updates)) {
+        const parts = path.split(".");
+        const key = parts.pop();
+        parts.reduce((object, part) => object[part], this)[key] = value;
+      }
+    }
+  };
+  const plan = spellSlotSpendPlan(actor.system.spells, { 3: 2 }, { 3: 7 });
+
+  assert.deepEqual(plan, {
+    spends: { 3: 2 },
+    updates: {
+      "system.spells.spell3.value": 0,
+      "system.spells.pact.value": 1
+    },
+    bonus: 14
+  });
+  await applyResourceUpdates(actor, [], plan.updates);
+  assert.equal(actor.system.spells.spell3.value, 0);
+  assert.equal(actor.system.spells.pact.value, 1);
+  assert.throws(
+    () => spellSlotSpendPlan(actor.system.spells, { 3: 3 }, { 3: 7 }),
+    /Not enough level 3 spell slots remain/
   );
 });
 
@@ -298,15 +421,38 @@ test("chat submission author lookup prefers the Foundry author identity", () => 
   assert.equal(chatMessageAuthorId({ user: "legacy-id" }), "legacy-id");
 });
 
-test("difficulty bands and capped failure damage use the specified thresholds", () => {
+test("default difficulty bands use the exact encounter thresholds", () => {
   const bands = [
-    { min: 1, max: 8, label: "Easy", dc: 18 },
-    { min: 9, max: 16, label: "Medium", dc: 23 },
-    { min: 17, max: 18, label: "Hard", dc: 28 },
-    { min: 19, max: 20, label: "Combat", dc: 28 }
+    { min: 1, max: 7, label: "Easy", dc: 19 },
+    { min: 8, max: 16, label: "Medium", dc: 23 },
+    { min: 17, max: 18, label: "Hard", dc: 29 },
+    { min: 19, max: 19, label: "Deadly", dc: 34 },
+    { min: 20, max: 20, label: "Combat", dc: 0, combat: true }
   ];
-  assert.equal(encounterBand(17, bands).dc, 28);
-  assert.equal(encounterBand(20, bands).label, "Combat");
+  assert.deepEqual([1, 7, 8, 16, 17, 18, 19, 20].map((roll) => {
+    const { min, max, label, dc } = encounterBand(roll, bands);
+    return { min, max, label, dc };
+  }), [
+    { min: 1, max: 7, label: "Easy", dc: 19 },
+    { min: 1, max: 7, label: "Easy", dc: 19 },
+    { min: 8, max: 16, label: "Medium", dc: 23 },
+    { min: 8, max: 16, label: "Medium", dc: 23 },
+    { min: 17, max: 18, label: "Hard", dc: 29 },
+    { min: 17, max: 18, label: "Hard", dc: 29 },
+    { min: 19, max: 19, label: "Deadly", dc: 34 },
+    { min: 20, max: 20, label: "Combat", dc: 0 }
+  ]);
+  assert.match(applicationSource, /\{ min: 1, max: 7, label: "Easy", dc: 19 \}[\s\S]*\{ min: 8, max: 16, label: "Medium", dc: 23 \}[\s\S]*\{ min: 17, max: 18, label: "Hard", dc: 29 \}[\s\S]*\{ min: 19, max: 19, label: "Deadly", dc: 34 \}[\s\S]*\{ min: 20, max: 20, label: "Combat", dc: 0, combat: true \}/);
+});
+
+test("the configured active feat and spell limit counts uses together", () => {
+  assert.equal(activeUseCount([{ count: 2 }, { count: 1 }, { count: "" }]), 3);
+  assert.equal(validateActiveUseLimit(5, 5), 5);
+  assert.throws(() => validateActiveUseLimit(6, 5), /no more than 5 active feats or spells/);
+  assert.throws(() => validateActiveUseLimit(0, -1), /non-negative whole number/);
+});
+
+test("capped failure damage uses the specified thresholds", () => {
   assert.deepEqual(failureDamage(101, 10, 15, 1), { margin: 5, fraction: 0.25, damage: 25 });
   assert.deepEqual(failureDamage(80, 1, 100, 0.35), { margin: 99, fraction: 0.35, damage: 28 });
 });

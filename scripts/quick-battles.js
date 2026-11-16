@@ -1,5 +1,6 @@
 import {
   applyResourceUpdates,
+  activeUseCount,
   averageRoundedDown,
   availableSpellSlots,
   capDamageAtOneHp,
@@ -15,8 +16,9 @@ import {
   reassignEncounterGroup,
   resourceBonus,
   selectedCatalogBonuses,
-  spellSlotBonus,
-  submittedRollTotal
+  spellSlotSpendPlan,
+  submittedRollTotal,
+  validateActiveUseLimit
 } from "./logic.js";
 
 const MODULE_ID = "skyys-quick-battles";
@@ -33,11 +35,13 @@ const DEFAULT_CONFIG = {
   paceModifiers: { fast: -2, normal: 0, slow: 2 },
   spellSlotBonuses: { 1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 3, 7: 3, 8: 3, 9: 4 },
   encounterDifficultyBands: [
-    { min: 1, max: 8, label: "Easy", dc: 18 },
-    { min: 9, max: 16, label: "Medium", dc: 23 },
-    { min: 17, max: 18, label: "Hard", dc: 28 },
-    { min: 19, max: 20, label: "Combat", dc: 28, combat: true }
+    { min: 1, max: 7, label: "Easy", dc: 19 },
+    { min: 8, max: 16, label: "Medium", dc: 23 },
+    { min: 17, max: 18, label: "Hard", dc: 29 },
+    { min: 19, max: 19, label: "Deadly", dc: 34 },
+    { min: 20, max: 20, label: "Combat", dc: 0, combat: true }
   ],
+  maxActiveUses: 5,
   damageCap: 1,
   postGmResults: true
 };
@@ -179,6 +183,11 @@ function normalizeConfig(candidate) {
   }
   if (nextRoll !== 21) throw new Error("Encounter difficulty bands must cover d20 results 1 through 20.");
   config.damageCap = Math.min(1, Math.max(0, numberValue(config.damageCap, "damageCap")));
+  const maxActiveUses = Number(config.maxActiveUses);
+  if (!Number.isInteger(maxActiveUses) || maxActiveUses < 0) {
+    throw new Error("Maximum number of active feats or spells must be a non-negative whole number.");
+  }
+  config.maxActiveUses = maxActiveUses;
   return config;
 }
 
@@ -267,6 +276,7 @@ function readConfigurationForm(element, baseConfig = DEFAULT_CONFIG) {
     })
   );
   config.damageCap = number(element, "damageCap");
+  config.maxActiveUses = number(element, "maxActiveUses");
   config.postGmResults = field(element, "postGmResults")?.checked ?? false;
   return config;
 }
@@ -526,7 +536,15 @@ function updateActiveBonusPreview(element) {
     bonusPerUse: input.dataset.bonusPerUse
   }));
   const bonus = resourceBonus(entries);
+  const count = activeUseCount(entries);
+  const limit = Number(preview.dataset.maxActiveUses);
+  const feedback = preview.querySelector("[data-active-use-feedback]");
+  const overLimit = count > limit;
   preview.querySelector("[data-bonus-total]").textContent = `${bonus >= 0 ? "+" : ""}${bonus}`;
+  feedback.textContent = overLimit
+    ? `${count} selected; maximum is ${limit}. Reduce selected uses before rolling.`
+    : `${count} of ${limit} active feats or spells selected.`;
+  feedback.dataset.overLimit = String(overLimit);
 }
 
 function createButton(label, action, attributes = "") {
@@ -636,6 +654,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     this.actorOptions = [];
     this.users = [];
     this.activeEncounterId = null;
+    this.activeCatalogIndex = null;
   }
 
   async _prepareContext() {
@@ -691,11 +710,8 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       })),
       catalogOverrides: config.catalogOverrides.map((override) => ({
         ...override,
-        isPassive: override.type === "Passive",
-        isActive: override.type === "Active",
-        isLow: override.rating === "Low",
-        isMedium: override.rating === "Medium",
-        isHigh: override.rating === "High"
+        type: override.type ?? "Active",
+        rating: override.rating ?? "Low"
       })),
       spellSlots: Array.from({ length: 9 }, (_, index) => {
         const level = index + 1;
@@ -728,6 +744,24 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         this._updateGroupSummaries();
       }
     });
+    this.element.addEventListener("keydown", (event) => {
+      if (!event.target.matches("[data-config-tab]")) return;
+      const tabs = Array.from(this.element.querySelectorAll("[data-config-tab]"));
+      const currentIndex = tabs.indexOf(event.target);
+      const nextIndex = event.key === "ArrowRight"
+        ? (currentIndex + 1) % tabs.length
+        : event.key === "ArrowLeft"
+          ? (currentIndex - 1 + tabs.length) % tabs.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? tabs.length - 1
+              : -1;
+      if (nextIndex < 0) return;
+      event.preventDefault();
+      tabs[nextIndex].focus();
+      this._selectConfigurationTab(tabs[nextIndex]);
+    });
     this.element.addEventListener("input", (event) => {
       const field = event.target;
       if (field.matches('[data-config-collection="encounterGroups"] [data-field="name"]')) {
@@ -752,6 +786,31 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       }
       row.querySelector("[data-group-summary]").textContent = selectedNames.join(", ") || "Select encounter groups";
     }
+  }
+
+  _selectConfigurationTab(tab) {
+    const selectedTab = typeof tab === "string"
+      ? this.element.querySelector(`[data-config-tab="${tab}"]`)
+      : tab;
+    if (!selectedTab) return;
+    for (const button of this.element.querySelectorAll("[data-config-tab]")) {
+      const selected = button === selectedTab;
+      button.setAttribute("aria-selected", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
+    for (const panel of this.element.querySelectorAll("[data-config-tab-panel]")) {
+      panel.hidden = panel.dataset.configTabPanel !== selectedTab.dataset.configTab;
+    }
+  }
+
+  _selectedConfigurationTab() {
+    return this.element.querySelector('[data-config-tab][aria-selected="true"]')?.dataset.configTab ?? "groups";
+  }
+
+  async _rerenderConfiguration({ tab = this._selectedConfigurationTab(), openCatalogManager = false } = {}) {
+    await this.render({ force: true });
+    this._selectConfigurationTab(tab);
+    if (openCatalogManager) this.element.querySelector("[data-catalog-manager-dialog]").showModal();
   }
 
   _updateMainCharacterOptions(row, userId) {
@@ -875,6 +934,65 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     dialog.showModal();
   }
 
+  _openCatalogDialog(row) {
+    this.configDraft = readConfigurationForm(
+      this.element.querySelector(".qb-configuration-form"),
+      this.configDraft ?? DEFAULT_CONFIG
+    );
+    const index = Number(row.dataset.configIndex);
+    const override = this.configDraft.catalogOverrides[index];
+    if (!override) throw new Error("The selected catalog feature could not be found.");
+    this.activeCatalogIndex = index;
+    const dialog = this.element.querySelector("[data-catalog-edit-dialog]");
+    dialog.querySelector("[data-catalog-dialog-title]").textContent = `Configure ${override.name || "feature"}`;
+    for (const name of ["name", "description", "type", "rating", "bonus", "bonusPerUse"]) {
+      const field = dialog.querySelector(`[data-catalog-dialog-field="${name}"]`);
+      field.value = override[name] ?? "";
+    }
+    dialog.querySelector('[data-catalog-dialog-field="disabled"]').checked = override.disabled === true;
+    dialog.showModal();
+  }
+
+  _saveCatalogDialog() {
+    const dialog = this.element.querySelector("[data-catalog-edit-dialog]");
+    if (!dialog.reportValidity()) return;
+    this.configDraft = readConfigurationForm(
+      this.element.querySelector(".qb-configuration-form"),
+      this.configDraft ?? DEFAULT_CONFIG
+    );
+    const override = this.configDraft.catalogOverrides[this.activeCatalogIndex];
+    if (!override) throw new Error("The catalog feature being edited no longer exists.");
+    for (const name of ["name", "description", "type", "rating"]) {
+      override[name] = dialog.querySelector(`[data-catalog-dialog-field="${name}"]`).value.trim();
+    }
+    for (const name of ["bonus", "bonusPerUse"]) {
+      const value = dialog.querySelector(`[data-catalog-dialog-field="${name}"]`).value.trim();
+      if (value === "") delete override[name];
+      else override[name] = Number(value);
+    }
+    override.disabled = dialog.querySelector('[data-catalog-dialog-field="disabled"]').checked;
+    const row = Array.from(this.element.querySelectorAll('[data-config-collection="catalogOverrides"] [data-config-row]'))
+      .find((entry) => Number(entry.dataset.configIndex) === this.activeCatalogIndex);
+    if (!row) throw new Error("The catalog feature row could not be updated.");
+    row.querySelector("[data-field='name']").value = override.name;
+    row.querySelector("[data-field='description']").value = override.description ?? "";
+    row.querySelector("[data-field='type']").value = override.type;
+    row.querySelector("[data-field='rating']").value = override.rating;
+    row.querySelector("[data-field='bonus']").value = override.bonus ?? "";
+    row.querySelector("[data-field='bonusPerUse']").value = override.bonusPerUse ?? "";
+    row.querySelector("[data-field='disabled']").checked = override.disabled;
+    row.querySelector("[data-feature-name]").textContent = override.name;
+    row.querySelector("[data-feature-type]").textContent = override.type;
+    row.querySelector("[data-feature-rating]").textContent = override.rating;
+    row.querySelector('[data-app-action="edit-catalog-override"]').setAttribute(
+      "aria-label",
+      `Configure ${override.name}`
+    );
+    row.querySelector('[data-app-action="remove-row"]').setAttribute("aria-label", `Remove ${override.name}`);
+    dialog.close();
+    this.activeCatalogIndex = null;
+  }
+
   _saveEncounterDialog() {
     const dialog = this.element.querySelector("[data-encounter-dialog]");
     for (const input of dialog.querySelectorAll("input:invalid, select:invalid, textarea:invalid")) {
@@ -918,6 +1036,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
   }
 
   async _removeEncounterGroup(button) {
+    const selectedTab = this._selectedConfigurationTab();
     const form = this.element.querySelector(".qb-configuration-form");
     const draft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
     const row = button.closest("[data-config-row]");
@@ -937,18 +1056,52 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     draft.encounterGroups = remaining;
     draft.encounters = reassignEncounterGroup(draft.encounters, groupId, remaining[0].id);
     this.configDraft = draft;
-    return this.render();
+    return this._rerenderConfiguration({ tab: selectedTab });
   }
 
   async _handleConfigurationAction(button) {
     const action = button.dataset.appAction;
     if (action === "save-config") {
       const form = this.element.querySelector(".qb-configuration-form");
-      if (!form.reportValidity()) return;
+      const invalidField = form.querySelector(":invalid");
+      if (invalidField) {
+        const panel = invalidField.closest("[data-config-tab-panel]");
+        if (panel) this._selectConfigurationTab(panel.dataset.configTabPanel);
+        invalidField.reportValidity();
+        return;
+      }
       this.configDraft = await writeConfig(readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG));
       ui.notifications.info("Quick Battles configuration saved.");
       mainApplication?.render();
       return this.close();
+    }
+    if (action === "select-config-tab") {
+      this._selectConfigurationTab(button);
+      return;
+    }
+    if (action === "open-catalog-manager") {
+      this.configDraft = readConfigurationForm(
+        this.element.querySelector(".qb-configuration-form"),
+        this.configDraft ?? DEFAULT_CONFIG
+      );
+      this.element.querySelector("[data-catalog-manager-dialog]").showModal();
+      return;
+    }
+    if (action === "close-catalog-manager") {
+      this.element.querySelector("[data-catalog-manager-dialog]").close();
+      return;
+    }
+    if (action === "edit-catalog-override") {
+      this._openCatalogDialog(button.closest("[data-config-row]"));
+      return;
+    }
+    if (action === "cancel-catalog-dialog") {
+      this.element.querySelector("[data-catalog-edit-dialog]").close();
+      this.activeCatalogIndex = null;
+      return;
+    }
+    if (action === "save-catalog-dialog") {
+      return this._saveCatalogDialog();
     }
     if (action === "remove-row") {
       const row = button.closest("[data-config-row], [data-roster-row]");
@@ -956,11 +1109,14 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         row.remove();
         return;
       }
+      const reopenCatalogManager = Boolean(row?.closest("[data-catalog-manager-dialog]")?.open);
+      const selectedTab = this._selectedConfigurationTab();
       const form = this.element.querySelector(".qb-configuration-form");
       this.configDraft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
       row?.remove();
       this.configDraft = readConfigurationForm(form, this.configDraft);
-      return this.render();
+      await this._rerenderConfiguration({ tab: selectedTab, openCatalogManager: reopenCatalogManager });
+      return;
     }
     if (action === "remove-group") {
       return this._removeEncounterGroup(button);
@@ -999,8 +1155,19 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       this.configDraft.encounterDifficultyBands.push({ min: 1, max: 0, label: "", dc: 0 });
     } else if (action === "add-override") {
       this.configDraft.catalogOverrides.push({ name: "", type: "Active", rating: "Low" });
+      const index = this.configDraft.catalogOverrides.length - 1;
+      await this._rerenderConfiguration({ openCatalogManager: true });
+      const row = Array.from(this.element.querySelectorAll('[data-config-collection="catalogOverrides"] [data-config-row]'))
+        .find((entry) => Number(entry.dataset.configIndex) === index);
+      this._openCatalogDialog(row);
+      return;
     }
-    return this.render();
+    const selectedTab = action === "add-encounter"
+      ? "encounters"
+      : action === "add-band"
+        ? "difficulty"
+        : this._selectedConfigurationTab();
+    return this._rerenderConfiguration({ tab: selectedTab });
   }
 }
 
@@ -1103,7 +1270,13 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     const expected = payload.preview;
     const activeItems = expected.activeItems.map((option) => {
       const item = actor.items.get(option.itemId);
-      return { ...option, available: itemUses(item).available };
+      const resourceAvailable = itemUses(item).available;
+      const resourceCostPerUse = option.resourceCostPerUse ?? 1;
+      return {
+        ...option,
+        available: Math.floor(resourceAvailable / resourceCostPerUse),
+        ...(option.resourceCostPerUse ? { resourceAvailable } : {})
+      };
     }).filter((option) => option.available > 0);
     const currentSpellSlots = availableSpellSlots(actor.system?.spells);
     const spellSlots = expected.spellSlots.flatMap((slot) => {
@@ -1118,6 +1291,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       passiveEntries: expected.passiveEntries,
       activeItems,
       spellSlots,
+      maxActiveUses: payload.config?.maxActiveUses ?? 5,
       spells: expected.spells,
       situational: payload.situational,
       dc: payload.dc
@@ -1284,7 +1458,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     await persistRun(current.run, current.message);
     await ChatMessage.create({
       content: chatCard(
-        `<header><div><span class="qb-eyebrow">Encounter selected</span><h3>${escapeHtml(selected.name)}</h3></div><span class="qb-encounter-difficulty">${escapeHtml(current.run.selectedEncounter.difficultyLabel)} · DC ${escapeHtml(current.run.selectedEncounter.dc)}</span></header><p>${escapeHtml(selected.description ?? "")}</p>`,
+        `<header><div><span class="qb-eyebrow">Encounter</span><h3>${escapeHtml(selected.name)}</h3></div><span class="qb-encounter-difficulty">${escapeHtml(current.run.selectedEncounter.difficultyLabel)} DC ${escapeHtml(current.run.selectedEncounter.dc)}</span></header><p>${escapeHtml(selected.description ?? "")}</p>`,
         "qb-encounter-card"
       ),
       flags: {
@@ -1350,7 +1524,10 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
             dc: current.run.selectedEncounter.dc,
             situational,
             status: "pending",
-            config: { spellSlotBonuses: config.spellSlotBonuses },
+            config: {
+              spellSlotBonuses: config.spellSlotBonuses,
+              maxActiveUses: config.maxActiveUses
+            },
             preview
           }
         }
@@ -1386,6 +1563,9 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       const preview = payload.preview;
       const activePlan = this._activeSpendPlan(actor, preview.activeItems);
       const slotPlan = this._slotSpendPlan(actor, preview.spellSlots, config.spellSlotBonuses);
+      validateActiveUseLimit(activePlan.count + activeUseCount(
+        Object.values(slotPlan.spends).map((count) => ({ count }))
+      ), config.maxActiveUses);
       const situational = numberValue(this.element.querySelector('[name="situational"]').value, "Situational modifier");
       const totalModifier = preview.passive.total + activePlan.bonus + slotPlan.bonus + situational;
       const roll = await nativeD20(actor, totalModifier, `Quick Battle check · ${actor.name}`);
@@ -1444,6 +1624,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
 
   _activeSpendPlan(actor, options) {
     let bonus = 0;
+    let countSpent = 0;
     const updates = [];
     for (const option of options) {
       const input = this.element.querySelector(`[name="active-${CSS.escape(option.itemId)}"]`);
@@ -1455,34 +1636,30 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
 
       const item = actor.items.get(option.itemId);
       const current = itemUses(item);
-      if (!item || count > current.available) throw new Error(`${option.name} no longer has enough uses available.`);
+      const resourceCount = count * (option.resourceCostPerUse ?? 1);
+      if (!item || resourceCount > current.available) throw new Error(`${option.name} no longer has enough uses available.`);
       const updateValue = current.updatePath === "system.uses.spent"
-        ? current.current + count
-        : current.current - count;
+        ? current.current + resourceCount
+        : current.current - resourceCount;
       updates.push({ _id: item.id, [current.updatePath]: updateValue });
       const itemBonus = count * option.bonusPerUse;
       bonus += itemBonus;
+      countSpent += count;
     }
-    return { bonus, updates };
+    return { bonus, updates, count: countSpent };
   }
 
   _slotSpendPlan(actor, slots, bonusesByLevel) {
     const spends = {};
-    const updates = {};
     for (const slot of slots) {
       const input = this.element.querySelector(`[name="slot-${slot.level}"]`);
       const rawCount = numberValue(input?.value ?? 0, `Level ${slot.level} spell slots`);
       if (!Number.isInteger(rawCount)) throw new Error(`Level ${slot.level} spell slots must be a whole number.`);
       const count = rawCount;
       if (count < 0 || count > slot.available) throw new Error(`Invalid number of level ${slot.level} spell slots.`);
-      if (count === 0) continue;
-      const key = `spell${slot.level}`;
-      const current = Math.max(0, Number(actor.system?.spells?.[key]?.value) || 0);
-      if (count > current) throw new Error(`Not enough level ${slot.level} spell slots remain.`);
-      spends[slot.level] = count;
-      updates[`system.spells.${key}.value`] = current - count;
+      if (count > 0) spends[slot.level] = count;
     }
-    return { spends, updates, bonus: spellSlotBonus(spends, bonusesByLevel) };
+    return spellSlotSpendPlan(actor.system?.spells, spends, bonusesByLevel);
   }
 }
 
@@ -1493,7 +1670,6 @@ function renderParticipantResult(details, damageApplied) {
   const signed = (value) => `${Number(value) >= 0 ? "+" : ""}${Number(value) || 0}`;
   const passiveBreakdown = [
     `${details.passive.abilityName} ${signed(details.passive.ability)}`,
-    `CHA ${signed(details.passive.charisma)}`,
     `HP ${signed(details.passive.hp)}`,
     `AC ${signed(details.passive.armor)}`,
     ...details.passiveEntries.map((entry) => `${escapeHtml(entry.name)} ${signed(entry.bonus)}`)
@@ -1536,10 +1712,9 @@ async function submitFateRoll(runId, requestId, userId) {
   try {
     const roll = await nativeD20(null, 0, "Quick Battles Fate d20");
     if (!roll) return;
-    await ChatMessage.create({
-      content: `<p>Fate d20: ${roll.total}</p>`,
+    await roll.toMessage({
+      flavor: "Quick Battles Fate d20",
       whisper: [...new Set([...gmUserIds(), game.user.id])],
-      rolls: [roll],
       flags: { [MODULE_ID]: { type: "fate-submission", runId, requestId, userId: game.user.id } }
     });
   } finally {

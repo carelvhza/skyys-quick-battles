@@ -42,6 +42,51 @@
   gap: 0.85rem;
 }
 
+.qb-config-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: 0.85rem;
+}
+
+.qb-config-tabs {
+  align-content: start;
+}
+
+.qb-config-tab-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--color-border-light-2);
+}
+
+.qb-config-tab-list [role="tab"] {
+  min-width: 0;
+  min-height: 2.4rem;
+  padding: 0.35rem;
+  border: 1px solid var(--color-border-light-2);
+  border-radius: 0.35rem;
+  background: var(--color-cool-4);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.qb-config-tab-list [role="tab"][aria-selected="true"] {
+  border-color: var(--color-warm-1);
+  background: color-mix(in srgb, var(--color-warm-2) 20%, var(--color-cool-4));
+  color: var(--color-text-primary);
+}
+
+.qb-config-tab-panel {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.qb-config-tab-panel[hidden] {
+  display: none;
+}
+
 .qb-config-intro,
 .qb-config-save {
   grid-column: 1 / -1;
@@ -97,7 +142,7 @@
   min-width: 0;
   gap: 0.7rem;
   padding: 0.9rem;
-  border: 1px solid var(--color-border-light-2);
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 0.6rem;
   background:
     linear-gradient(145deg, color-mix(in srgb, var(--color-cool-4) 45%, transparent), transparent 58%),
@@ -318,7 +363,7 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: 0.75rem;
   min-width: 0;
-  padding: 0.6rem;
+  padding: 0.2rem;
   border: 1px solid var(--color-border-light-2);
   border-radius: 0.3rem;
 }
@@ -331,16 +376,50 @@
 .qb-config-rows .qb-group-row {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
+  border: none !important;
+  margin: 0 !important;
+  gap: 12px !important;
 }
 
 .qb-config-rows .qb-encounter-config-row {
   grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) auto;
   align-items: end;
+  border: none !important;
+  margin: 0 !important;
+  gap: 12px !important;
 }
 
 .qb-config-rows .qb-difficulty-row {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
   align-items: end;
+  border: none !important;
+  margin: 0 !important;
+  gap: 12px !important;
+}
+
+.qb-config-rows .qb-feature-row {
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem;
+}
+
+.qb-feature-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.qb-feature-badge {
+  justify-self: start;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--color-border-light-2);
+  border-radius: 999px;
+  background: var(--color-cool-4);
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .qb-config-actions {
@@ -702,6 +781,10 @@
   font-weight: 600;
 }
 
+.qb-active-bonus-preview [data-over-limit="true"] {
+  color: var(--color-level-error, #a12622);
+}
+
 .qb-active-bonus-preview strong {
   min-width: 2.8rem;
   padding: 0.25rem 0.55rem;
@@ -734,7 +817,11 @@
 }
 
 @container quick-battles (max-width: 40rem) {
-  .qb-config-pair-grid {
+  .qb-config-top-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .qb-config-summary-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -751,7 +838,12 @@
   .qb-config-rows .qb-group-row,
   .qb-config-rows .qb-encounter-config-row,
   .qb-config-rows .qb-difficulty-row,
+  .qb-config-rows .qb-feature-row,
   .qb-config-rows .qb-roster-config-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .qb-config-tab-list {
     grid-template-columns: minmax(0, 1fr);
   }
 

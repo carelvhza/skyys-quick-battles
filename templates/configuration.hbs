@@ -96,7 +96,6 @@
             </fieldset>
           {{/each}}
         </div>
-        <button type="button" class="qb-secondary" data-app-action="add-band">Add difficulty band</button>
       </section>
     </div>
 
@@ -118,7 +117,6 @@
           <label class="qb-field"><span>Level {{level}} slot</span><input data-field="spellSlot{{level}}" type="number" value="{{bonus}}" required /></label>
         {{/each}}
       </section>
-    </div>
 
     <div class="qb-config-pair-grid">
     <section class="qb-section">
@@ -130,41 +128,76 @@
     <section class="qb-section">
       <div class="qb-section-heading">
         <h2>Feature catalog changes</h2>
-        <button type="button" class="qb-secondary" data-app-action="add-override">Add feature change</button>
+        <button type="button" class="qb-primary" data-app-action="open-catalog-manager">Manage feature catalog</button>
       </div>
       <p class="qb-muted">Add custom features, change a feature's type or bonus, or disable a catalog entry by name.</p>
-      <div class="qb-config-rows" data-config-collection="catalogOverrides">
+    </section>
+
+    <button type="button" class="qb-primary qb-config-save" data-app-action="save-config">Validate and save settings</button>
+  </form>
+
+  <dialog class="qb-config-dialog" data-catalog-manager-dialog aria-labelledby="qb-catalog-manager-title">
+    <div class="qb-dialog-content qb-catalog-manager-content">
+      <div class="qb-section-heading qb-dialog-wide">
+        <h2 id="qb-catalog-manager-title">Manage feature catalog</h2>
+        <button type="button" class="qb-secondary" data-app-action="close-catalog-manager" aria-label="Close feature catalog">Close</button>
+      </div>
+      <p class="qb-muted qb-dialog-wide">Add custom features, change a feature's type or bonus, or disable a catalog entry by name.</p>
+      <div class="qb-config-rows qb-dialog-wide" data-config-collection="catalogOverrides">
         {{#each config.catalogOverrides}}
           <fieldset data-config-row data-config-index="{{@index}}" class="qb-feature-row">
-            <label class="qb-field"><span>Feature name</span><input type="text" data-field="name" value="{{name}}" required /></label>
-            <label class="qb-field"><span>Description override</span><textarea data-field="description" rows="2">{{description}}</textarea></label>
-            <label class="qb-field">
-              <span>Type</span>
-              <select data-field="type">
-                <option value="Passive" {{#if isPassive}}selected{{/if}}>Passive</option>
-                <option value="Active" {{#if isActive}}selected{{/if}}>Active</option>
-              </select>
-            </label>
-            <label class="qb-field">
-              <span>Rating</span>
-              <select data-field="rating">
-                <option value="Low" {{#if isLow}}selected{{/if}}>Low (+1)</option>
-                <option value="Medium" {{#if isMedium}}selected{{/if}}>Medium (+2)</option>
-                <option value="High" {{#if isHigh}}selected{{/if}}>High (+3)</option>
-              </select>
-            </label>
-            <label class="qb-field"><span>Passive bonus override</span><input data-field="bonus" type="number" value="{{bonus}}" /></label>
-            <label class="qb-field"><span>Bonus per active use override</span><input data-field="bonusPerUse" type="number" value="{{bonusPerUse}}" /></label>
-            <label class="qb-checkbox-field"><input data-field="disabled" type="checkbox" {{#if disabled}}checked{{/if}} /> Disable this catalog entry</label>
-            <button type="button" class="qb-secondary" data-app-action="remove-row">Remove feature change</button>
+            <input data-field="name" type="hidden" value="{{name}}" />
+            <input data-field="description" type="hidden" value="{{description}}" />
+            <input data-field="type" type="hidden" value="{{type}}" />
+            <input data-field="rating" type="hidden" value="{{rating}}" />
+            <input data-field="bonus" type="hidden" value="{{bonus}}" />
+            <input data-field="bonusPerUse" type="hidden" value="{{bonusPerUse}}" />
+            <input data-field="disabled" type="checkbox" {{#if disabled}}checked{{/if}} hidden />
+            <span class="qb-feature-name" data-feature-name>{{name}}</span>
+            <span class="qb-feature-badge" data-feature-type>{{type}}</span>
+            <span class="qb-feature-badge" data-feature-rating>{{rating}}</span>
+            <button type="button" class="qb-secondary" data-app-action="edit-catalog-override" aria-label="Configure {{name}}">Configure</button>
+            <button type="button" class="qb-secondary" data-app-action="remove-row" aria-label="Remove {{name}}">Remove</button>
           </fieldset>
+        {{else}}
+          <p class="qb-muted" data-catalog-empty>No feature changes have been added.</p>
         {{/each}}
       </div>
     </section>
     </div>
 
-    <button type="button" class="qb-primary qb-config-save" data-app-action="save-config">Validate and save settings</button>
-  </form>
+  <dialog class="qb-config-dialog" data-catalog-edit-dialog aria-labelledby="qb-catalog-edit-title">
+    <div class="qb-dialog-content">
+      <div class="qb-section-heading qb-dialog-wide">
+        <h2 id="qb-catalog-edit-title" data-catalog-dialog-title>Configure feature</h2>
+        <button type="button" class="qb-secondary" data-app-action="cancel-catalog-dialog" aria-label="Close feature configuration">Close</button>
+      </div>
+      <label class="qb-field qb-dialog-wide"><span>Feature name</span><input data-catalog-dialog-field="name" type="text" required /></label>
+      <label class="qb-field qb-dialog-wide"><span>Description override</span><textarea data-catalog-dialog-field="description" rows="3"></textarea></label>
+      <label class="qb-field">
+        <span>Type</span>
+        <select data-catalog-dialog-field="type">
+          <option value="Passive">Passive</option>
+          <option value="Active">Active</option>
+        </select>
+      </label>
+      <label class="qb-field">
+        <span>Rating</span>
+        <select data-catalog-dialog-field="rating">
+          <option value="Low">Low (+1)</option>
+          <option value="Medium">Medium (+2)</option>
+          <option value="High">High (+3)</option>
+        </select>
+      </label>
+      <label class="qb-field"><span>Passive bonus override</span><input data-catalog-dialog-field="bonus" type="number" /></label>
+      <label class="qb-field"><span>Bonus per active use override</span><input data-catalog-dialog-field="bonusPerUse" type="number" /></label>
+      <label class="qb-checkbox-field qb-dialog-wide"><input data-catalog-dialog-field="disabled" type="checkbox" /> Disable this catalog entry</label>
+      <div class="qb-dialog-actions qb-dialog-wide">
+        <button type="button" class="qb-secondary" data-app-action="cancel-catalog-dialog">Cancel</button>
+        <button type="button" class="qb-primary" data-app-action="save-catalog-dialog">Save feature</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog class="qb-config-dialog" data-encounter-dialog aria-labelledby="qb-encounter-dialog-title">
     <div class="qb-dialog-content">
@@ -194,7 +227,7 @@
       <p data-confirm-message></p>
       <div class="qb-dialog-actions">
         <button type="submit" value="cancel" class="qb-secondary">Cancel</button>
-        <button type="submit" value="confirm" class="qb-primary">Remove group</button>
+        <button type="submit" value="confirm" class="qb-primary">Remove</button>
       </div>
     </form>
   </dialog>

@@ -132,17 +132,15 @@ export function highestAbility(abilities = {}) {
 
 export function calculatePassiveBonuses({ abilities = {}, currentHp = 0, ac = 0, catalogBonus = 0 } = {}) {
   const bestAbility = highestAbility(abilities);
-  const charismaModifier = finiteNumber(abilities.cha?.mod ?? abilities.cha, 0);
   const armorClass = finiteNumber(ac, 0);
   const bonuses = {
     ability: bestAbility.modifier,
     abilityName: bestAbility.key.toUpperCase(),
-    charisma: Math.ceil(charismaModifier / 2),
     hp: Math.floor(finiteNumber(currentHp, 0) / 50),
     armor: armorClass >= 22 ? 2 : armorClass >= 19 ? 1 : 0,
     catalog: finiteNumber(catalogBonus, 0)
   };
-  bonuses.total = bonuses.ability + bonuses.charisma + bonuses.hp + bonuses.armor + bonuses.catalog;
+  bonuses.total = bonuses.ability + bonuses.hp + bonuses.armor + bonuses.catalog;
   return bonuses;
 }
 
@@ -183,24 +181,113 @@ export function spellSlotBonus(spends, bonusesByLevel = {}) {
 }
 
 export function availableSpellSlots(spells = {}, bonusesByLevel = {}) {
-  return Array.from({ length: 9 }, (_, index) => {
+  const slots = Array.from({ length: 9 }, (_, index) => {
     const level = index + 1;
-    const slot = spells[`spell${level}`];
+    const key = `spell${level}`;
+    const slot = spells[key];
     const capacity = Math.max(0, finiteNumber(slot?.max ?? slot?.override, 0));
     if (capacity === 0) return null;
     return {
       level,
       capacity,
       available: Math.min(capacity, Math.max(0, finiteNumber(slot?.value, 0))),
-      bonus: finiteNumber(bonusesByLevel[level], 0)
+      bonus: finiteNumber(bonusesByLevel[level], 0),
+      resources: [{
+        key,
+        capacity,
+        current: Math.max(0, finiteNumber(slot?.value, 0)),
+        available: Math.min(capacity, Math.max(0, finiteNumber(slot?.value, 0)))
+      }]
     };
   }).filter(Boolean);
+
+  const pact = spells.pact;
+  const pactLevel = Math.floor(finiteNumber(pact?.level, 0));
+  const pactCapacity = Math.max(0, finiteNumber(pact?.max ?? pact?.override, 0));
+  if (pactLevel >= 1 && pactLevel <= 9 && pactCapacity > 0) {
+    let slot = slots.find((entry) => entry.level === pactLevel);
+    if (!slot) {
+      slot = {
+        level: pactLevel,
+        capacity: 0,
+        available: 0,
+        bonus: finiteNumber(bonusesByLevel[pactLevel], 0),
+        resources: []
+      };
+      slots.push(slot);
+    }
+    const current = Math.max(0, finiteNumber(pact.value, 0));
+    const available = Math.min(pactCapacity, current);
+    slot.capacity += pactCapacity;
+    slot.available += available;
+    slot.resources.push({
+      key: "pact",
+      capacity: pactCapacity,
+      current,
+      available
+    });
+  }
+
+  return slots.sort((left, right) => left.level - right.level);
+}
+
+export function spellSlotSpendPlan(spells = {}, spends = {}, bonusesByLevel = {}) {
+  const availableByLevel = new Map(availableSpellSlots(spells).map((slot) => [slot.level, slot]));
+  const updates = {};
+  const validSpends = {};
+
+  for (const [rawLevel, rawCount] of Object.entries(spends)) {
+    const level = Number(rawLevel);
+    const count = Number(rawCount);
+    if (!Number.isInteger(level) || level < 1 || level > 9 || !Number.isInteger(count) || count < 0) {
+      throw new Error("Spell-slot spends must use whole-number levels and counts.");
+    }
+    if (count === 0) continue;
+
+    const slot = availableByLevel.get(level);
+    if (!slot || count > slot.available) {
+      throw new Error(`Not enough level ${level} spell slots remain.`);
+    }
+
+    let remaining = count;
+    for (const resource of slot.resources) {
+      const spent = Math.min(remaining, resource.available);
+      if (spent === 0) continue;
+      updates[`system.spells.${resource.key}.value`] = resource.current - spent;
+      remaining -= spent;
+    }
+    if (remaining > 0) throw new Error(`Not enough level ${level} spell slots remain.`);
+    validSpends[level] = count;
+  }
+
+  return {
+    spends: validSpends,
+    updates,
+    bonus: spellSlotBonus(validSpends, bonusesByLevel)
+  };
 }
 
 export function resourceBonus(entries = []) {
   return entries.reduce((total, entry) => {
     return total + Math.max(0, Math.floor(finiteNumber(entry.count))) * finiteNumber(entry.bonusPerUse);
   }, 0);
+}
+
+export function activeUseCount(entries = []) {
+  return entries.reduce((total, entry) => {
+    return total + Math.max(0, Math.floor(finiteNumber(entry.count)));
+  }, 0);
+}
+
+export function validateActiveUseLimit(count, limit) {
+  const maximum = Number(limit);
+  if (!Number.isInteger(maximum) || maximum < 0) {
+    throw new Error("The maximum number of active feats or spells must be a non-negative whole number.");
+  }
+  if (count > maximum) {
+    throw new Error(`Choose no more than ${maximum} active feats or spells.`);
+  }
+  return count;
 }
 
 export function chatMessageAuthorId(message) {
@@ -311,11 +398,15 @@ export function selectedCatalogBonuses(catalog, actorItems) {
     }
 
     const uses = itemUses(item);
-    if (uses.available > 0) {
+    const isLayOnHands = entry.name.toLocaleLowerCase() === "lay on hands";
+    const resourceCostPerUse = isLayOnHands ? 20 : 1;
+    const available = Math.floor(uses.available / resourceCostPerUse);
+    if (available > 0) {
       activeEntries.push({
         name: entry.name,
-        bonusPerUse: finiteNumber(entry.bonusPerUse ?? entry.bonus),
-        available: uses.available,
+        bonusPerUse: isLayOnHands ? 1 : finiteNumber(entry.bonusPerUse ?? entry.bonus),
+        available,
+        ...(isLayOnHands ? { resourceCostPerUse, resourceAvailable: uses.available } : {}),
         updatePath: uses.updatePath,
         current: uses.current,
         itemId: item.id
