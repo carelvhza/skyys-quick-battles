@@ -1,5 +1,6 @@
 import {
   applyResourceUpdates,
+  activeUseCount,
   averageRoundedDown,
   availableSpellSlots,
   capDamageAtOneHp,
@@ -16,7 +17,8 @@ import {
   resourceBonus,
   selectedCatalogBonuses,
   spellSlotSpendPlan,
-  submittedRollTotal
+  submittedRollTotal,
+  validateActiveUseLimit
 } from "./logic.js";
 
 const MODULE_ID = "skyys-quick-battles";
@@ -33,11 +35,13 @@ const DEFAULT_CONFIG = {
   paceModifiers: { fast: -2, normal: 0, slow: 2 },
   spellSlotBonuses: { 1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 3, 7: 3, 8: 3, 9: 4 },
   encounterDifficultyBands: [
-    { min: 1, max: 8, label: "Easy", dc: 18 },
-    { min: 9, max: 16, label: "Medium", dc: 23 },
-    { min: 17, max: 18, label: "Hard", dc: 28 },
-    { min: 19, max: 20, label: "Combat", dc: 28, combat: true }
+    { min: 1, max: 7, label: "Easy", dc: 19 },
+    { min: 8, max: 16, label: "Medium", dc: 23 },
+    { min: 17, max: 18, label: "Hard", dc: 29 },
+    { min: 19, max: 19, label: "Deadly", dc: 34 },
+    { min: 20, max: 20, label: "Combat", dc: 0, combat: true }
   ],
+  maxActiveUses: 5,
   damageCap: 1,
   postGmResults: true
 };
@@ -179,6 +183,11 @@ function normalizeConfig(candidate) {
   }
   if (nextRoll !== 21) throw new Error("Encounter difficulty bands must cover d20 results 1 through 20.");
   config.damageCap = Math.min(1, Math.max(0, numberValue(config.damageCap, "damageCap")));
+  const maxActiveUses = Number(config.maxActiveUses);
+  if (!Number.isInteger(maxActiveUses) || maxActiveUses < 0) {
+    throw new Error("Maximum number of active feats or spells must be a non-negative whole number.");
+  }
+  config.maxActiveUses = maxActiveUses;
   return config;
 }
 
@@ -267,6 +276,7 @@ function readConfigurationForm(element, baseConfig = DEFAULT_CONFIG) {
     })
   );
   config.damageCap = number(element, "damageCap");
+  config.maxActiveUses = number(element, "maxActiveUses");
   config.postGmResults = field(element, "postGmResults")?.checked ?? false;
   return config;
 }
@@ -526,7 +536,15 @@ function updateActiveBonusPreview(element) {
     bonusPerUse: input.dataset.bonusPerUse
   }));
   const bonus = resourceBonus(entries);
+  const count = activeUseCount(entries);
+  const limit = Number(preview.dataset.maxActiveUses);
+  const feedback = preview.querySelector("[data-active-use-feedback]");
+  const overLimit = count > limit;
   preview.querySelector("[data-bonus-total]").textContent = `${bonus >= 0 ? "+" : ""}${bonus}`;
+  feedback.textContent = overLimit
+    ? `${count} selected; maximum is ${limit}. Reduce selected uses before rolling.`
+    : `${count} of ${limit} active feats or spells selected.`;
+  feedback.dataset.overLimit = String(overLimit);
 }
 
 function createButton(label, action, attributes = "") {
@@ -1276,6 +1294,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       passiveEntries: expected.passiveEntries,
       activeItems,
       spellSlots,
+      maxActiveUses: payload.config?.maxActiveUses ?? 5,
       spells: expected.spells,
       situational: payload.situational,
       dc: payload.dc
@@ -1508,7 +1527,10 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
             dc: current.run.selectedEncounter.dc,
             situational,
             status: "pending",
-            config: { spellSlotBonuses: config.spellSlotBonuses },
+            config: {
+              spellSlotBonuses: config.spellSlotBonuses,
+              maxActiveUses: config.maxActiveUses
+            },
             preview
           }
         }
@@ -1544,6 +1566,9 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       const preview = payload.preview;
       const activePlan = this._activeSpendPlan(actor, preview.activeItems);
       const slotPlan = this._slotSpendPlan(actor, preview.spellSlots, config.spellSlotBonuses);
+      validateActiveUseLimit(activePlan.count + activeUseCount(
+        Object.values(slotPlan.spends).map((count) => ({ count }))
+      ), config.maxActiveUses);
       const situational = numberValue(this.element.querySelector('[name="situational"]').value, "Situational modifier");
       const totalModifier = preview.passive.total + activePlan.bonus + slotPlan.bonus + situational;
       const roll = await nativeD20(actor, totalModifier, `Quick Battle check · ${actor.name}`);
@@ -1602,6 +1627,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
 
   _activeSpendPlan(actor, options) {
     let bonus = 0;
+    let countSpent = 0;
     const updates = [];
     for (const option of options) {
       const input = this.element.querySelector(`[name="active-${CSS.escape(option.itemId)}"]`);
@@ -1621,8 +1647,9 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       updates.push({ _id: item.id, [current.updatePath]: updateValue });
       const itemBonus = count * option.bonusPerUse;
       bonus += itemBonus;
+      countSpent += count;
     }
-    return { bonus, updates };
+    return { bonus, updates, count: countSpent };
   }
 
   _slotSpendPlan(actor, slots, bonusesByLevel) {
