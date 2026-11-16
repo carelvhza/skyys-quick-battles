@@ -24,6 +24,7 @@ import {
 const MODULE_ID = "skyys-quick-battles";
 const TEMPLATE = `modules/${MODULE_ID}/templates/quick-battles.hbs`;
 const CONFIG_TEMPLATE = `modules/${MODULE_ID}/templates/configuration.hbs`;
+const QUICK_BATTLE_CHAT_COMMANDS = ["quickbattle", "quickbattles"];
 const DEFAULT_LAST_SELECTION = { area: "medium", encounterGroupId: "" };
 const DEFAULT_CONFIG = {
   players: [],
@@ -624,6 +625,43 @@ async function openMainApplication() {
   await effectiveCatalog(config);
   mainApplication ??= new QuickBattlesApplication({ mode: "gm" });
   await mainApplication.render({ force: true });
+}
+
+function openQuickBattles() {
+  if (!game.user.isGM) {
+    ui.notifications.warn("Only a GM can open Quick Battles.");
+    return false;
+  }
+  openMainApplication().catch(notifyError);
+  return false;
+}
+
+function registerQuickBattleChatCommands() {
+  const commands = ui.chat?.constructor?.CHAT_COMMANDS;
+  if (!commands) throw new Error("Foundry's ChatLog command registry is unavailable.");
+  for (const command of QUICK_BATTLE_CHAT_COMMANDS) {
+    commands[command] = {
+      rgx: new RegExp(`^\\/${command}\\s*$`, "i"),
+      fn: openQuickBattles
+    };
+  }
+}
+
+function addQuickBattleTokenControl(controls) {
+  const tokenControl = controls.tokens;
+  if (!tokenControl) return;
+  tokenControl.tools ??= {};
+  tokenControl.tools.quickbattles = {
+    name: "quickbattles",
+    title: "Quick Battle",
+    icon: "fa-solid fa-swords",
+    order: 100,
+    button: true,
+    visible: game.user.isGM,
+    onChange: (_event, active) => {
+      if (active) openQuickBattles();
+    }
+  };
 }
 
 class QuickBattlesConfigurationApplication extends foundry.applications.api.HandlebarsApplicationMixin(
@@ -2096,8 +2134,12 @@ function bindChatActions() {
   });
 }
 
-Hooks.once("init", registerModuleSettings);
+Hooks.once("init", () => {
+  registerModuleSettings();
+  Hooks.on("getSceneControlButtons", addQuickBattleTokenControl);
+});
 Hooks.once("ready", () => {
+  registerQuickBattleChatCommands();
   bindChatActions();
   loadCatalog().catch(notifyError);
   Hooks.on("renderChatMessage", hideSubmittedCheckAction);
@@ -2113,9 +2155,4 @@ Hooks.once("ready", () => {
       }
     }
   }
-  Hooks.on("chatMessage", (_log, message) => {
-    if (message.trim().toLocaleLowerCase() !== "/quickbattles") return;
-    openMainApplication().catch(notifyError);
-    return false;
-  });
 });
