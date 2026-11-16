@@ -67,8 +67,9 @@
         </details>
       </div>
 
-      <div class="qb-active-bonus-preview" data-active-bonus-preview role="status" aria-live="polite" aria-atomic="true">
+      <div class="qb-active-bonus-preview" data-active-bonus-preview data-max-active-uses="{{maxActiveUses}}" role="status" aria-live="polite" aria-atomic="true">
         <span>Selected resource bonus</span>
+        <span data-active-use-feedback></span>
         <strong data-bonus-total>+0</strong>
       </div>
       <button class="qb-primary" type="button" data-app-action="submit-check">Roll and submit vs DC {{dc}}</button>

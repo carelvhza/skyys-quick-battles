@@ -273,6 +273,23 @@ export function resourceBonus(entries = []) {
   }, 0);
 }
 
+export function activeUseCount(entries = []) {
+  return entries.reduce((total, entry) => {
+    return total + Math.max(0, Math.floor(finiteNumber(entry.count)));
+  }, 0);
+}
+
+export function validateActiveUseLimit(count, limit) {
+  const maximum = Number(limit);
+  if (!Number.isInteger(maximum) || maximum < 0) {
+    throw new Error("The maximum number of active feats or spells must be a non-negative whole number.");
+  }
+  if (count > maximum) {
+    throw new Error(`Choose no more than ${maximum} active feats or spells.`);
+  }
+  return count;
+}
+
 export function chatMessageAuthorId(message) {
   const author = message?.author;
   if (typeof author === "string") return author;

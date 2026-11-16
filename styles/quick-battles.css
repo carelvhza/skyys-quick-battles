@@ -770,6 +770,10 @@
   font-weight: 600;
 }
 
+.qb-active-bonus-preview [data-over-limit="true"] {
+  color: var(--color-level-error, #a12622);
+}
+
 .qb-active-bonus-preview strong {
   min-width: 2.8rem;
   padding: 0.25rem 0.55rem;
