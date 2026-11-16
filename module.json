@@ -1,8 +1,8 @@
 {
   "id": "skyys-quick-battles",
   "title": "Skyy's Quick Battles",
-  "description": "A lightweight, Foundry-native workflow for travel threats, encounter selection, and resource-powered checks.",
-  "version": "0.1.16",
+  "description": "A small module to allow players to roll single rolls with bonuses based on passive and spent resources, to resolve a battle in one roll.",
+  "version": "0.1.15",
   "compatibility": {
     "minimum": "14",
     "verified": "14"

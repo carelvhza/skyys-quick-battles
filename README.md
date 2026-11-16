@@ -1,26 +1,46 @@
 # Skyy's Quick Battles
 
-A lightweight Foundry VTT module for travel Fate checks, grouped encounter selection, and resource-powered D&D 5e 6.x participant checks. The module targets Foundry VTT 14, uses Foundry's native application and roll APIs, and adds no runtime dependencies.
+This Foundry VTT module is for those who want a way to allow draining resources of heroes while traveling, without having them play out entire tactical battles. It allows you to roll chance for battle, a randomized encounter with a configured DC, and the ability for players to each choose which resources they want to spend (if any) in the battle, and make one D20 roll with the bonuses for a fated roll. Failure costs the character hit points.
 
-## Open the GM window
+## Installation
+Paste the manifest url in your Foundry module install window.
+[https://github.com/carelvhza/skyys-quick-battles/releases/latest/download/module.json](https://github.com/carelvhza/skyys-quick-battles/releases/latest/download/module.json)
 
-Enable the module, then open the Quick Battles window as a GM with `/quickbattles` in chat or `Shift+Alt+B`. Type the slash command exactly as shown; `quickbattle,s` is not a registered command. The window stays open as Fate, encounter, and participant stages progress.
+## Configuration
+You can configure the settings by finding it in the Game Settings menu under Skyy's Quick Battles.
 
-## Configure players and encounters
+Before you can use Quick Battles, you need to add participating players and encounters.
+There are various configuration options for the various numbers and modifiers that are used in the rolls.
+See **Usage** for more information.
 
-In Foundry, open **Game Settings → Configure Settings → Module Settings → Quick Battles configuration → Configure**. The responsive GM-only editor places player-to-actor mappings beside tabs for encounter groups, encounters, and difficulty bands. Fate and travel, spell-slot bonuses, and results and damage appear together in a three-column row. Use **Manage feature catalog** at the bottom to open the catalog editor; each feature change is shown as a compact row, and **Configure** opens its description, type, rating, bonus, and disable options. Configuration is shared across GM profiles in the world. A GM mapping may use any character or NPC; a player mapping lists only characters owned by that player. Long actor lists are scrollable. Encounters can belong to multiple groups, selected from the group-name dropdown; their stable IDs remain internal. The first group is named **Main** on a new or empty configuration. Removing a group linked to encounters asks for confirmation and transfers those links to the first remaining group.
+Add players and make sure to select the actor player characters to use in the battles.
+Add at least one encounter, by specifying the name, the group it is in (for example, groups can be regions the party is traveling in), and if you want, configure a description, override the values, and add enemies. These enemies are just there if you choose to add a 'Combat' encounter difficulty band that would trigger actual combat. It won't automatically create the combat, but it will list the enemies for the encounter if it is a combat encounter.
 
-The Quick Battles window remembers the last Fate area and encounter group selected on that client. Active run state is stored in the world settings for recovery without an extra GM-only run chat card. A GM can cancel a pending or selected run from the window and start a fresh Fate check.
+## Usage
+Access the Quick Battles screen by clicking its button under User Tokens' sub menu, or by pressing Shift+Alt+B. You can also activate it via a chat command /quickbattles.
 
-Use the player dropdown to add a mapping, then choose an actor owned by that player. Encounter cards show the encounter name and group memberships; **Configure** opens a dialog for its description, optional DC/label overrides, and GM-only enemy roster. Roster counts do not modify encounter difficulty. Difficulty bands must cover d20 results 1–20 contiguously. Feature catalog cards can change a feature's description, type, or bonus, disable a default entry by name, or add a custom feature; Low/Medium/High ratings map to +1/+2/+3.
+![alt text](image1.png)
 
-## Defaults
+Choose the situation, area difficulty and travel pace. The situation and area difficulty options can be customized in settings.
+Then, you click Start Fate check, which triggers a roll for you on Foundry (it will be a 1dX, where x is the number of participating players). That will randomize and prompt a random player to roll a D20 'fate' roll and add the bonuses. If it beats the area difficulty dc, then no quick battle starts. On a fail, it will trigger more rolls for you, which are used to determine the difficulty of the battle, and if it is in first or second shift (if the situation is camping). The shifts refer to guard shifts during a long rest.
 
-- Fate area DCs: 10 / 13 / 16; camp +3; fast/regular/slow pace -2 / 0 / +2; situational modifier 0.
-- A failed Fate check rolls a d20 for encounter difficulty. The default bands preserve the original macro's 40% / 40% / 10% / 10% distribution: 1–8 DC 18, 9–16 DC 23, 17–18 DC 28, and 19–20 Combat at DC 28. Each band is configurable.
-- Passive participant bonuses are the highest STR/DEX/INT/WIS/CHA modifier (first wins ties), `ceil(CHA modifier / 2)`, `floor(current HP / 40)`, AC +1 at 19–21 / +2 at 22+, and matching catalogued passive features.
-- Slot bonuses are +1 for levels 1–2, +2 for 3–5, +3 for 6–8, and +4 for level 9. The check lists only spell levels with positive D&D 5e slot capacity (`max` or an explicit `override`), including levels whose slots are all spent; the spendable count is the current `value`. Warlock pact slots appear at their pact level, sharing that level's configured bonus and combining with any regular slots at the same level. Players choose any available feature uses and slots to spend; selected resources are consumed on submission through the actor's native item/slot data, regardless of outcome.
-- Failure damage is `floor(max HP × min(cap, 5% × points below DC))`; the default cap is 100%. The active GM applies damage; the actor-side operation ID prevents duplicate application if the control is retried.
-- Reward generation is not included until reward rules are supplied.
+You will then get a screen that will allow you to roll a random encounter for the selected group / area.
 
-The Fate result and tactical roster are shown only to the GM. Recovery cards are permission-checked, player check prompts are private and removed after submission, and participant results are public with a separate GM-only damage control that is removed after damage is applied. The GM window presents the Fate/current run beside encounter and participant controls, and returns to a new Fate check after a run is resolved or cancelled. The supplied original macros are represented by module stages rather than copied inline styling or macro-name execution.
+![alt text](image2.png)
+
+After that you will be able to prompt participants to do their quick battle checks, based on the rolled encounter.
+
+![alt text](image3.png)
+
+The prompt to the player wills how them a list of passive bonuses, and active features and spell slots. The player can spend these to increase their roll, and will then roll a D20. On a success, they take no damage, on a fail, they take damage based on the difference between the DC and their roll.
+
+> There are configurable options for limiting number of active feats of spell slots that can be spent, the scores for spell levels, whether the damage should be capped less than 100% (using a fraction 1 == can take 100% damage, and 0.5 would be max 50% per battle).
+> You can also configure the feats, by overriding them by name, or by adding custom feats or missing feats in, assigning the impact on the roll they give.
+
+## AI Usage
+
+I have used significant AI use to help me code this. I wouldn't describe this as 'vibe coded' though, as I made many changes myself. It is a passion module that I made for myself, so it has no large significance, but if you do not approve of the use of AI, then you are informed of its use in this project.
+
+## License
+
+This project is licensed under the [MIT License](https://opensource.org/license/mit).
