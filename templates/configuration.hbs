@@ -133,23 +133,25 @@
         {{/each}}
       </section>
 
-      <section class="qb-section">
-        <h2>Results and damage</h2>
-        <label class="qb-field"><span>Maximum damage fraction (0–1)</span><input data-field="damageCap" type="number" min="0" max="1" step="0.05" value="{{config.damageCap}}" required /></label>
-        <label class="qb-field"><span>Maximum number of active feats or spells that can be used</span><input data-field="maxActiveUses" type="number" min="0" step="1" value="{{config.maxActiveUses}}" required /></label>
-        <label class="qb-checkbox-field"><input data-field="postGmResults" type="checkbox" {{#if config.postGmResults}}checked{{/if}} /> Post GM results to chat</label>
-      </section>
+      <div class="qb-config-result-column">
+        <section class="qb-section">
+          <h2>Results and damage</h2>
+          <label class="qb-field"><span>Maximum damage fraction (0–1)</span><input data-field="damageCap" type="number" min="0" max="1" step="0.05" value="{{config.damageCap}}" required /></label>
+          <label class="qb-field"><span>Maximum number of active feats or spells that can be used</span><input data-field="maxActiveUses" type="number" min="0" step="1" value="{{config.maxActiveUses}}" required /></label>
+          <label class="qb-checkbox-field"><input data-field="postGmResults" type="checkbox" {{#if config.postGmResults}}checked{{/if}} /> Post GM results to chat</label>
+        </section>
+
+        <section class="qb-section qb-config-catalog">
+          <div class="qb-section-heading">
+            <h2>Feature catalog changes</h2>
+            <button type="button" class="qb-primary" data-app-action="open-catalog-manager">Manage feature catalog</button>
+          </div>
+          <p class="qb-muted">Add custom features, change a feature's type or bonus, or disable a catalog entry by name.</p>
+        </section>
+      </div>
     </div>
 
-    <section class="qb-section">
-      <div class="qb-section-heading">
-        <h2>Feature catalog changes</h2>
-        <button type="button" class="qb-primary" data-app-action="open-catalog-manager">Manage feature catalog</button>
-      </div>
-      <p class="qb-muted">Add custom features, change a feature's type or bonus, or disable a catalog entry by name.</p>
-    </section>
-
-    <button type="button" class="qb-primary qb-config-save" data-app-action="save-config">Validate and save settings</button>
+    <button type="button" class="qb-primary qb-config-save" data-app-action="save-config">Save Settings</button>
   </form>
 
   <dialog class="qb-config-dialog" data-catalog-manager-dialog aria-labelledby="qb-catalog-manager-title">

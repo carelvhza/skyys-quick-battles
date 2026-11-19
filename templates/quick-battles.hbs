@@ -1,4 +1,4 @@
-<section class="qb-shell">
+<section class="qb-shell {{#if isParticipant}}qb-participant-shell{{/if}}">
   {{#if isParticipant}}
     <form class="qb-check-form">
       <header class="qb-actor-header">
@@ -9,6 +9,16 @@
         </div>
       </header>
 
+      <div class="qb-check-totals">
+        <div class="qb-active-bonus-preview qb-passive-bonus-preview">
+          <span>Total passive</span><strong>{{signed passive.total}}</strong>
+        </div>
+        <div class="qb-active-bonus-preview" data-active-bonus-preview data-max-active-uses="{{maxActiveUses}}" role="status" aria-live="polite" aria-atomic="true">
+          <span>Total active <small data-active-use-feedback></small></span>
+          <strong data-bonus-total>+0</strong>
+        </div>
+      </div>
+      <div class="qb-check-scroll">
       <div class="qb-panel">
         <h3>Passive bonuses</h3>
         <dl class="qb-bonus-list">
@@ -18,7 +28,6 @@
           {{#each passiveEntries}}
             <div><dt>{{name}}</dt><dd>{{signed bonus}}</dd></div>
           {{/each}}
-          <div class="qb-total"><dt>Total passive</dt><dd>{{signed passive.total}}</dd></div>
         </dl>
       </div>
 
@@ -66,13 +75,8 @@
           {{/each}}
         </details>
       </div>
-
-      <div class="qb-active-bonus-preview" data-active-bonus-preview data-max-active-uses="{{maxActiveUses}}" role="status" aria-live="polite" aria-atomic="true">
-        <span>Selected resource bonus</span>
-        <span data-active-use-feedback></span>
-        <strong data-bonus-total>+0</strong>
       </div>
-      <button class="qb-primary" type="button" data-app-action="submit-check">Roll and submit vs DC {{dc}}</button>
+      <button class="qb-primary qb-check-submit" type="button" data-app-action="submit-check">Roll vs DC {{dc}}</button>
     </form>
   {{else}}
     <div class="qb-main-layout {{#unless showCurrentRun}}qb-main-layout-no-opposition{{/unless}}">
@@ -84,7 +88,15 @@
                 <span class="qb-eyebrow">Quick Battle</span>
                 <h2>Current run</h2>
               </div>
-              {{#if state.fateResult.failed}}<span class="qb-stage-badge qb-stage-threat">Threat detected</span>{{else}}<span class="qb-stage-badge">In progress</span>{{/if}}
+              {{#if checksComplete}}
+                <span class="qb-stage-badge">Complete</span>
+              {{else if noThreat}}
+                <span class="qb-stage-badge">No threat</span>
+              {{else if state.fateResult.failed}}
+                <span class="qb-stage-badge qb-stage-threat">Threat detected</span>
+              {{else}}
+                <span class="qb-stage-badge">In progress</span>
+              {{/if}}
             </header>
             <p class="qb-muted">{{state.statusLabel}}</p>
             {{#if state.fateResult}}
@@ -113,13 +125,16 @@
             {{#if canCancelRun}}
               <button class="qb-secondary qb-cancel-run" type="button" data-app-action="cancel-run">Cancel current run</button>
             {{/if}}
+            {{#if noThreat}}
+              <button class="qb-primary" type="button" data-app-action="new-battle">New Quick Battle</button>
+            {{/if}}
           </section>
         {{else}}
           <section class="qb-section qb-fate-section">
             <header class="qb-section-heading">
               <div>
-                <span class="qb-eyebrow">Begin a journey</span>
-                <h2>Fate check</h2>
+                <span class="qb-eyebrow">Start a Quick Battle</span>
+                <h2>Fate Check</h2>
               </div>
               {{!-- <span class="qb-stage-badge">New run</span> --}}
             </header>
@@ -157,10 +172,7 @@
             </form>
           </section>
         {{/if}}
-      </div>
-
-      {{#if showCurrentRun}}
-      <aside class="qb-secondary-column">
+      {{#if showEncounter}}
         {{#if groups.length}}
           <section class="qb-section qb-encounter-section">
             <header class="qb-section-heading">
@@ -192,25 +204,6 @@
                 </details>
               </div>
 
-              <section class="qb-participant-section">
-                <header class="qb-section-heading">
-                  <div>
-                    <span class="qb-eyebrow">Party roster</span>
-                    <h3>Participants</h3>
-                  </div>
-                  <span class="qb-stage-badge">{{actors.length}} configured</span>
-                </header>
-                <div class="qb-participants">
-                  {{#each actors}}
-                    <label class="qb-participant-row">
-                      <span class="qb-participant-name"><input type="checkbox" class="qb-participant" value="{{uuid}}" {{#if defaultSelected}}checked{{/if}} /> {{name}}</span>
-                      <input class="qb-situational" data-actor-uuid="{{uuid}}" type="number" value="0" aria-label="Situational modifier for {{name}}" />
-                      {{#if checkStatus}}<small>{{checkStatus}}</small>{{/if}}
-                    </label>
-                  {{/each}}
-                </div>
-                <button class="qb-primary" type="button" data-app-action="start-checks" {{#unless canStartChecks}}disabled{{/unless}}>Prompt participant checks</button>
-              </section>
             {{/if}}
           </section>
         {{else}}
@@ -224,9 +217,49 @@
             <p class="qb-muted">Add encounter groups and entries in Game Settings → Module Settings → Quick Battles configuration.</p>
           </section>
         {{/if}}
+      {{/if}}
+      </div>
+      {{#if state.selectedEncounter}}
+      <aside class="qb-secondary-column">
+        {{#if checksComplete}}<h2 class="qb-combat-complete">Combat complete</h2>{{/if}}
+        <section class="qb-section qb-participant-section">
+          <header class="qb-section-heading">
+            <div><h2>Party</h2><span class="qb-eyebrow">Battle Participants</span></div>
+            <span class="qb-stage-badge">{{actors.length}} configured</span>
+          </header>
+          <div class="qb-participants">
+            {{#each actors}}
+              {{#if ../checksStarted}}
+                {{#if checkStatus}}
+                  <article class="qb-party-card">
+                    <img src="{{img}}" alt="" />
+                    <div><strong>{{name}}</strong><span>Level {{level}}</span><span class="qb-party-status qb-party-status-{{status}}">{{checkStatus}}</span>{{#if damageApplied}}<small>Damage applied</small>{{/if}}</div>
+                    {{#if canApplyDamage}}<button type="button" class="qb-secondary" data-app-action="apply-party-damage" data-actor-uuid="{{uuid}}">Apply {{damage}} damage</button>{{/if}}
+                  </article>
+                {{/if}}
+              {{else}}
+                <label class="qb-participant-row">
+                  <span class="qb-participant-name"><input type="checkbox" class="qb-participant" value="{{uuid}}" {{#if defaultSelected}}checked{{/if}} /> {{name}}</span>
+                  <input class="qb-situational" data-actor-uuid="{{uuid}}" type="number" value="0" aria-label="Situational modifier for {{name}}" />
+                </label>
+              {{/if}}
+            {{/each}}
+          </div>
+          {{#if checksComplete}}
+            <button class="qb-primary" type="button" data-app-action="new-battle">New Quick Battle</button>
+          {{else}}
+            {{#unless checksStarted}}<button class="qb-primary" type="button" data-app-action="start-checks" {{#unless canStartChecks}}disabled{{/unless}}>Start Participant Checks</button>{{/unless}}
+          {{/if}}
+        </section>
       </aside>
       {{/if}}
     </div>
-
+    <dialog class="qb-confirm-dialog" data-reset-confirm-dialog aria-labelledby="qb-reset-title">
+      <form method="dialog">
+        <h2 id="qb-reset-title">Start a new Quick Battle?</h2>
+        <p>Some damage has not been applied. Starting a new battle will discard those pending damage actions.</p>
+        <div class="qb-dialog-actions"><button type="submit" value="cancel" class="qb-secondary">Cancel</button><button type="submit" value="confirm" class="qb-primary">Start new battle</button></div>
+      </form>
+    </dialog>
   {{/if}}
 </section>
