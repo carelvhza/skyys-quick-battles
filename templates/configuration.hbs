@@ -61,6 +61,12 @@
             <h2>Encounters</h2>
             <button type="button" class="qb-secondary" data-app-action="add-encounter">Add encounter</button>
           </div>
+          <label class="qb-field">
+            <span>Show encounters for group</span>
+            <select data-encounter-group-filter>
+              {{#each encounterGroupFilterOptions}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+            </select>
+          </label>
           <div class="qb-config-rows" data-config-collection="encounters">
             {{#each config.encounters}}
               <fieldset data-config-row data-encounter-id="{{id}}" class="qb-encounter-config-row">

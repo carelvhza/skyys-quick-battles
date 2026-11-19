@@ -694,12 +694,16 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     this.activeEncounterId = null;
     this.activeCatalogIndex = null;
     this.reopenCatalogManagerAfterEdit = false;
+    this.selectedEncounterGroupId = null;
   }
 
   async _prepareContext() {
     if (!game.user.isGM) throw new Error("Only a GM can configure Quick Battles.");
     const config = this.configDraft ?? await readConfig();
     this.configDraft ??= clone(config);
+    if (!config.encounterGroups.some((group) => group.id === this.selectedEncounterGroupId)) {
+      this.selectedEncounterGroupId = config.encounterGroups[0]?.id ?? null;
+    }
     const users = Array.from(game.users)
       .map((user) => ({ id: user.id, name: user.name }));
     const actors = sortActors().map((actor) => ({ uuid: actor.uuid, name: actor.name }));
@@ -760,11 +764,16 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     };
     const configuredUsers = new Set(config.players.map((player) => player.userId));
     const availableUsers = users.filter((user) => !configuredUsers.has(user.id));
-    return { config: preparedConfig, users, actors, availableUsers };
+    const encounterGroupFilterOptions = config.encounterGroups.map((group) => ({
+      ...group,
+      selected: group.id === this.selectedEncounterGroupId
+    }));
+    return { config: preparedConfig, users, actors, availableUsers, encounterGroupFilterOptions };
   }
 
   async _onRender(context, options) {
     await super._onRender(context, options);
+    this._filterEncounterRows();
     if (this.element?.dataset.qbConfigBound) return;
     this.element.dataset.qbConfigBound = "true";
     this.element.addEventListener("click", (event) => {
@@ -787,7 +796,16 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         this._updateMainCharacterOptions(field.closest("[data-config-row]"), field.value);
         this._refreshAvailablePlayers();
       } else if (field.matches('[data-field="groups"]')) {
+        const row = field.closest("[data-config-row]");
+        if (!row.querySelector('[data-field="groups"]:checked')) {
+          field.checked = true;
+          ui.notifications.warn("Each encounter must belong to at least one group.");
+        }
         this._updateGroupSummaries();
+        this._filterEncounterRows();
+      } else if (field.matches("[data-encounter-group-filter]")) {
+        this.selectedEncounterGroupId = field.value;
+        this._filterEncounterRows();
       }
     });
     this.element.addEventListener("keydown", (event) => {
@@ -823,6 +841,9 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       row.querySelector('[data-field="id"]').value,
       row.querySelector('[data-field="name"]').value.trim()
     ]));
+    for (const option of this.element.querySelectorAll("[data-encounter-group-filter] option")) {
+      option.textContent = groups.get(option.value) ?? "";
+    }
     for (const row of this.element.querySelectorAll('[data-config-collection="encounters"] [data-config-row]')) {
       const selectedNames = [];
       for (const option of row.querySelectorAll('[data-field="groups"]')) {
@@ -831,6 +852,13 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         if (option.checked && name) selectedNames.push(name);
       }
       row.querySelector("[data-group-summary]").textContent = selectedNames.join(", ") || "Select encounter groups";
+    }
+  }
+
+  _filterEncounterRows() {
+    for (const row of this.element.querySelectorAll('[data-config-collection="encounters"] [data-config-row]')) {
+      row.hidden = !Array.from(row.querySelectorAll('[data-field="groups"]:checked'))
+        .some((input) => input.value === this.selectedEncounterGroupId);
     }
   }
 
@@ -1125,6 +1153,12 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       if (invalidField) {
         const panel = invalidField.closest("[data-config-tab-panel]");
         if (panel) this._selectConfigurationTab(panel.dataset.configTabPanel);
+        const encounterRow = invalidField.closest("[data-encounter-id]");
+        if (encounterRow?.hidden) {
+          this.selectedEncounterGroupId = encounterRow.querySelector('[data-field="groups"]:checked')?.value;
+          this.element.querySelector("[data-encounter-group-filter]").value = this.selectedEncounterGroupId;
+          this._filterEncounterRows();
+        }
         invalidField.reportValidity();
         return;
       }
@@ -1206,7 +1240,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         id: randomId(),
         name: "",
         description: "",
-        groups: this.configDraft.encounterGroups[0] ? [this.configDraft.encounterGroups[0].id] : [],
+        groups: this.selectedEncounterGroupId ? [this.selectedEncounterGroupId] : [],
         roster: []
       });
     } else if (action === "add-band") {
