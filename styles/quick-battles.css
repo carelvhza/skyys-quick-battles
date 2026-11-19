@@ -482,6 +482,28 @@
   width: min(70vw, 56rem);
 }
 
+.qb-config-dialog[data-encounter-dialog] .qb-field,
+.qb-roster-config-row .qb-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+}
+
+.qb-config-dialog[data-encounter-dialog] .qb-field input,
+.qb-config-dialog[data-encounter-dialog] textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.qb-config-dialog[data-encounter-dialog] textarea {
+  min-height: 7rem;
+}
+
+.qb-roster-config-row .qb-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .qb-config-dialog::backdrop,
 .qb-confirm-dialog::backdrop {
   background: color-mix(in srgb, #000 55%, transparent);

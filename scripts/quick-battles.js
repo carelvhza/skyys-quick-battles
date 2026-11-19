@@ -904,7 +904,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     const actorSelect = document.createElement("select");
     actorSelect.dataset.dialogField = "actorUuid";
     actorSelect.setAttribute("aria-label", "Enemy actor");
-    actorSelect.size = this.actorOptions.length > 10 ? 10 : 1;
+    actorSelect.size = 1;
     const placeholder = document.createElement("option");
     placeholder.value = "";
     placeholder.textContent = "Use a custom name";
