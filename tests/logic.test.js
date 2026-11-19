@@ -125,6 +125,16 @@ test("configuration sections use the requested order and encounter details open 
   assert.match(applicationSource, /activeCatalogIndex/);
 });
 
+test("catalog editing opens separately and returns to the manager when closed", () => {
+  const openCatalogDialog = applicationSource.slice(
+    applicationSource.indexOf("_openCatalogDialog(row) {"),
+    applicationSource.indexOf("_saveCatalogDialog() {")
+  );
+  assert.ok(openCatalogDialog.indexOf("manager.close()") < openCatalogDialog.indexOf("dialog.showModal()"));
+  assert.match(applicationSource, /this\.element\.addEventListener\("close", \(event\) => \{\s*if \(event\.target\.matches\("\[data-catalog-edit-dialog\]"\)\) \{\s*this\.activeCatalogIndex = null;\s*this\._reopenCatalogManagerAfterEdit\(\);/);
+  assert.match(applicationSource, /_reopenCatalogManagerAfterEdit\(\) \{\s*if \(!this\.reopenCatalogManagerAfterEdit\) return;\s*this\.reopenCatalogManagerAfterEdit = false;[\s\S]*?manager\.showModal\(\)/);
+});
+
 test("encounter configuration fields use consistent layouts and a native actor dropdown", () => {
   const rosterRowSource = applicationSource.slice(
     applicationSource.indexOf("_createRosterRow(member = {})"),
