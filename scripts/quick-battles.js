@@ -693,6 +693,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     this.users = [];
     this.activeEncounterId = null;
     this.activeCatalogIndex = null;
+    this.reopenCatalogManagerAfterEdit = false;
   }
 
   async _prepareContext() {
@@ -772,6 +773,12 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       event.preventDefault();
       this._handleConfigurationAction(button).catch(notifyError);
     });
+    this.element.addEventListener("close", (event) => {
+      if (event.target.matches("[data-catalog-edit-dialog]")) {
+        this.activeCatalogIndex = null;
+        this._reopenCatalogManagerAfterEdit();
+      }
+    }, true);
     this.element.addEventListener("change", (event) => {
       const field = event.target;
       if (field.matches('[data-app-action="add-player"]')) {
@@ -984,6 +991,9 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     const override = this.configDraft.catalogOverrides[index];
     if (!override) throw new Error("The selected catalog feature could not be found.");
     this.activeCatalogIndex = index;
+    const manager = this.element.querySelector("[data-catalog-manager-dialog]");
+    this.reopenCatalogManagerAfterEdit = manager.open;
+    if (manager.open) manager.close();
     const dialog = this.element.querySelector("[data-catalog-edit-dialog]");
     dialog.querySelector("[data-catalog-dialog-title]").textContent = `Configure ${override.name || "feature"}`;
     for (const name of ["name", "description", "type", "rating", "bonus", "bonusPerUse"]) {
@@ -992,6 +1002,13 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     }
     dialog.querySelector('[data-catalog-dialog-field="disabled"]').checked = override.disabled === true;
     dialog.showModal();
+  }
+
+  _reopenCatalogManagerAfterEdit() {
+    if (!this.reopenCatalogManagerAfterEdit) return;
+    this.reopenCatalogManagerAfterEdit = false;
+    const manager = this.element.querySelector("[data-catalog-manager-dialog]");
+    if (manager && !manager.open) manager.showModal();
   }
 
   _saveCatalogDialog() {
