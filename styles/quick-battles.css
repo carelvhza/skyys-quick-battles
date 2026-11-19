@@ -389,6 +389,10 @@
   gap: 12px !important;
 }
 
+.qb-config-rows .qb-encounter-config-row[hidden] {
+  display: none;
+}
+
 .qb-config-rows .qb-difficulty-row {
   grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
   align-items: end;
