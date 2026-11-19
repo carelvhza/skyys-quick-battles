@@ -326,6 +326,15 @@ export function failureDamage(maxHp, total, dc, cap = 1, currentHp = maxHp) {
 export function itemUses(item) {
   const uses = item?.system?.uses;
   if (!uses) return { available: 0, updatePath: null, current: 0 };
+  if (uses.spent != null && uses.max != null) {
+    const maximum = Math.max(0, finiteNumber(uses.max));
+    const spent = Math.max(0, finiteNumber(uses.spent));
+    return {
+      available: Math.max(0, maximum - spent),
+      updatePath: "system.uses.spent",
+      current: spent
+    };
+  }
   if (uses.value != null) {
     const current = Math.max(0, finiteNumber(uses.value));
     const maximum = Number(uses.max);
@@ -336,14 +345,7 @@ export function itemUses(item) {
     };
   }
   if (uses.max == null) return { available: 0, updatePath: null, current: 0 };
-
-  const maximum = Math.max(0, finiteNumber(uses.max));
-  const spent = Math.max(0, finiteNumber(uses.spent));
-  return {
-    available: Math.max(0, maximum - spent),
-    updatePath: "system.uses.spent",
-    current: spent
-  };
+  return { available: Math.max(0, finiteNumber(uses.max)), updatePath: "system.uses.spent", current: 0 };
 }
 
 function getPathValue(object, path) {
