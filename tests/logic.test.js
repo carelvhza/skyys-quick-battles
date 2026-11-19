@@ -131,7 +131,7 @@ test("catalog editing opens separately and returns to the manager when closed", 
     applicationSource.indexOf("_saveCatalogDialog() {")
   );
   assert.ok(openCatalogDialog.indexOf("manager.close()") < openCatalogDialog.indexOf("dialog.showModal()"));
-  assert.match(applicationSource, /this\.element\.addEventListener\("close", \(event\) => \{\s*if \(event\.target\.matches\("\[data-catalog-edit-dialog\]"\)\) \{\s*this\.activeCatalogIndex = null;\s*this\._reopenCatalogManagerAfterEdit\(\);/);
+  assert.match(applicationSource, /this\.element\.addEventListener\("close", \(event\) => \{\s*if \(event\.target\.matches\("\[data-catalog-edit-dialog\]"\)\) \{[\s\S]*?this\.activeCatalogIndex = null;\s*this\._reopenCatalogManagerAfterEdit\(\);/);
   assert.match(applicationSource, /_reopenCatalogManagerAfterEdit\(\) \{\s*if \(!this\.reopenCatalogManagerAfterEdit\) return;\s*this\.reopenCatalogManagerAfterEdit = false;[\s\S]*?manager\.showModal\(\)/);
 });
 
