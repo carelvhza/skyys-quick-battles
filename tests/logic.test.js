@@ -512,7 +512,7 @@ test("damage application cap never raises HP and accounts for intervening damage
   assert.equal(capDamageAtOneHp(4, 10), 4);
 });
 
-test("native use data supports current-value and legacy spent counters", () => {
+test("native use data supports current-value and spent counters", () => {
   assert.deepEqual(itemUses({ system: { uses: { max: 3, value: 1 } } }), {
     available: 1,
     updatePath: "system.uses.value",
@@ -523,11 +523,51 @@ test("native use data supports current-value and legacy spent counters", () => {
     updatePath: "system.uses.spent",
     current: 1
   });
+  assert.deepEqual(itemUses({ system: { uses: { max: 3, spent: 1, value: 2 } } }), {
+    available: 2,
+    updatePath: "system.uses.spent",
+    current: 1
+  });
   assert.deepEqual(itemUses({ system: { uses: { value: 2 } } }), {
     available: 2,
     updatePath: "system.uses.value",
     current: 2
   });
+});
+
+test("D&D 5e derived item uses persist alongside spell-slot spending", async () => {
+  const item = {
+    id: "feature",
+    name: "Bardic Inspiration",
+    system: { uses: { max: 3, spent: 1, value: 2 } },
+    async update(changes) {
+      if ("system.uses.spent" in changes) this.system.uses.spent = changes["system.uses.spent"];
+      this.system.uses.value = Math.max(0, this.system.uses.max - this.system.uses.spent);
+    }
+  };
+  const actor = {
+    items: new Map([[item.id, item]]),
+    system: { spells: { spell1: { value: 2, max: 2 } } },
+    async update(changes) {
+      this.system.spells.spell1.value = changes["system.spells.spell1.value"];
+      changes._id = "actor";
+      return this;
+    }
+  };
+  const [feature] = selectedCatalogBonuses(
+    [{ name: item.name, type: "Active", bonusPerUse: 2 }], [item]
+  ).activeEntries;
+  const slots = spellSlotSpendPlan(actor.system.spells, { 1: 1 }, { 1: 3 });
+
+  assert.equal(feature.available, 2);
+  assert.equal(feature.updatePath, "system.uses.spent");
+  await applyResourceUpdates(actor, [
+    { _id: item.id, [feature.updatePath]: feature.current + 1 }
+  ], slots.updates);
+  assert.equal(item.system.uses.spent, 2);
+  assert.equal(item.system.uses.value, 1);
+  assert.equal(actor.system.spells.spell1.value, 1);
+  assert.equal(feature.bonusPerUse + slots.bonus, 5);
 });
 
 test("resource updates persist D&D 5e item uses and spell-slot values", async () => {
