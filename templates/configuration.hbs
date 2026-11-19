@@ -100,14 +100,15 @@
 
         <div id="qb-panel-difficulty" class="qb-config-tab-panel" role="tabpanel" aria-labelledby="qb-tab-difficulty" data-config-tab-panel="difficulty" hidden>
           <h2>Encounter difficulty bands</h2>
-          <p class="qb-muted">Ranges must cover d20 results 1–20 contiguously, without gaps or overlaps.</p>
+          <p class="qb-muted">Ranges must cover d20 results 1–20 contiguously, without gaps or overlaps. Damage is HP lost per point below the DC, subject to the settings under Results and damage.</p>
           <div class="qb-config-rows" data-config-collection="encounterDifficultyBands">
             {{#each config.encounterDifficultyBands}}
-              <fieldset data-config-row class="qb-difficulty-row">
+              <fieldset data-config-row data-config-index="{{@index}}" class="qb-difficulty-row">
                 <label class="qb-field"><span>Min roll</span><input data-field="min" type="number" min="1" max="20" value="{{min}}" required /></label>
                 <label class="qb-field"><span>Max roll</span><input data-field="max" type="number" min="1" max="20" value="{{max}}" required /></label>
                 <label class="qb-field"><span>Label</span><input type="text" data-field="label" value="{{label}}" required /></label>
                 <label class="qb-field"><span>DC</span><input data-field="dc" type="number" value="{{dc}}" required /></label>
+                <label class="qb-field"><span>Damage</span><input data-field="damage" type="number" min="0" step="1" value="{{damage}}" required /></label>
                 <label class="qb-checkbox-field"><input data-field="combat" type="checkbox" {{#if isCombat}}checked{{/if}} /> Combat</label>
                 <button type="button" class="qb-secondary" data-app-action="remove-row">Remove</button>
               </fieldset>
@@ -140,7 +141,8 @@
       <div class="qb-config-result-column">
         <section class="qb-section">
           <h2>Results and damage</h2>
-          <label class="qb-field"><span>Maximum damage fraction (0–1)</span><input data-field="damageCap" type="number" min="0" max="1" step="0.05" value="{{config.damageCap}}" required /></label>
+          <label class="qb-field"><span>Maximum damage (% of max HP)</span><input data-field="damageCap" type="number" min="0" max="100" step="any" value="{{config.damageCapPercent}}" required /></label>
+          <label class="qb-checkbox-field"><input data-field="keepOneHp" type="checkbox" {{#if config.keepOneHp}}checked{{/if}} /> Keep characters at a minimum of 1 HP</label>
           <label class="qb-field"><span>Maximum number of active feats or spells that can be used</span><input data-field="maxActiveUses" type="number" min="0" step="1" value="{{config.maxActiveUses}}" required /></label>
           <label class="qb-checkbox-field"><input data-field="postGmResults" type="checkbox" {{#if config.postGmResults}}checked{{/if}} /> Post GM results to chat</label>
         </section>

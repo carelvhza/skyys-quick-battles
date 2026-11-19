@@ -164,7 +164,7 @@ export function highestAbility(abilities = {}) {
   );
 }
 
-export function calculatePassiveBonuses({ abilities = {}, currentHp = 0, ac = 0, catalogBonus = 0 } = {}) {
+export function calculatePassiveBonuses({ abilities = {}, ac = 0, catalogBonus = 0 } = {}) {
   const bestAbility = highestAbility(abilities);
   const armorClass = finiteNumber(ac, 0);
   const armorBonus = armorClass >= 22 ? 2
@@ -176,11 +176,10 @@ export function calculatePassiveBonuses({ abilities = {}, currentHp = 0, ac = 0,
   const bonuses = {
     ability: bestAbility.modifier,
     abilityName: bestAbility.key.toUpperCase(),
-    hp: Math.floor(finiteNumber(currentHp, 0) / 50),
     armor: armorBonus,
     catalog: finiteNumber(catalogBonus, 0)
   };
-  bonuses.total = bonuses.ability + bonuses.hp + bonuses.armor + bonuses.catalog;
+  bonuses.total = bonuses.ability + bonuses.armor + bonuses.catalog;
   return bonuses;
 }
 
@@ -343,22 +342,23 @@ export function encounterBand(roll, bands) {
   return band;
 }
 
-export function capDamageAtOneHp(damage, currentHp) {
+export function capDamageAtOneHp(damage, currentHp, keepOneHp = true) {
   const requestedDamage = Math.max(0, Math.floor(finiteNumber(damage, 0)));
-  const availableDamage = Math.max(0, Math.floor(finiteNumber(currentHp, 0)) - 1);
+  const availableDamage = Math.max(0, Math.floor(finiteNumber(currentHp, 0)) - (keepOneHp ? 1 : 0));
   return Math.min(requestedDamage, availableDamage);
 }
 
-export function failureDamage(maxHp, total, dc, cap = 1, currentHp = maxHp) {
+export function failureDamage(maxHp, total, dc, damagePerPoint, cap = 1, currentHp = maxHp, keepOneHp = true) {
   const margin = Math.max(0, Math.floor(finiteNumber(dc) - finiteNumber(total)));
   const maxHitPoints = Math.max(0, finiteNumber(maxHp));
   const maxFraction = Math.min(1, Math.max(0, finiteNumber(cap, 1)));
-  const fraction = Math.min(maxFraction, margin * 0.05);
-  const calculatedDamage = Math.floor(maxHitPoints * fraction);
-  const damage = capDamageAtOneHp(calculatedDamage, currentHp);
+  const rate = Number(damagePerPoint);
+  if (!Number.isInteger(rate) || rate < 0) throw new Error("Damage per DC point must be a non-negative whole number.");
+  const calculatedDamage = Math.min(margin * rate, Math.floor(maxHitPoints * maxFraction));
+  const damage = capDamageAtOneHp(calculatedDamage, currentHp, keepOneHp);
   return {
     margin,
-    fraction: damage < calculatedDamage && maxHitPoints > 0 ? damage / maxHitPoints : fraction,
+    fraction: maxHitPoints > 0 ? damage / maxHitPoints : 0,
     damage
   };
 }

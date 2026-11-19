@@ -4,7 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 import Handlebars from "handlebars";
 import { JSDOM } from "jsdom";
-import { activeUseCount, d20ModifierParts, isRunActive, itemUses, resourceBonus } from "../scripts/logic.js";
+import { activeUseCount, capDamageAtOneHp, d20ModifierParts, failureDamage, isRunActive, itemUses, resourceBonus, spellSlotSpendPlan } from "../scripts/logic.js";
 
 const source = await readFile(new URL("../scripts/quick-battles.js", import.meta.url), "utf8");
 const html = await readFile(new URL("../templates/quick-battles.hbs", import.meta.url), "utf8");
@@ -96,6 +96,47 @@ test("active spend plans retain D&D 5e spent updates and record each selected bo
   assert.equal(plan.updates[0]["system.uses.spent"], 3);
   assert.equal(plan.entries[0].name, "Rage × 2");
   assert.equal(plan.entries[0].bonus, 4);
+});
+
+test("legacy pending prompts remove HP from both the displayed and submitted bonuses", async () => {
+  class ApplicationV2 { constructor(options) { this.options = options; } async close() {} }
+  const preview = {
+    actor: { name: "Hero" }, passive: { ability: 3, hp: 2, armor: 0, catalog: 0, total: 5 },
+    passiveEntries: [], activeItems: [], spellSlots: [], spells: []
+  };
+  const payload = { status: "pending", checkId: "check", runId: "run", actorUuid: "Actor.1", dc: 20, situational: 0, preview };
+  const actor = {
+    name: "Hero", uuid: "Actor.1", items: new Map(),
+    system: { attributes: { hp: { max: 100, value: 100 } } }, testUserPermission: () => true
+  };
+  const run = { status: "checks-pending", selectedEncounter: { damage: 4, damageCap: 1, keepOneHp: false }, fateResult: { difficulty: { dc: 19 } } };
+  let rolledModifier, sent;
+  const context = {
+    foundry: { applications: { api: { ApplicationV2, HandlebarsApplicationMixin: (base) => base } } },
+    MODULE_ID: "test", TEMPLATE: "template", DEFAULT_CONFIG: {}, inFlight: new Set(),
+    game: { user: { isGM: false } }, findMessageByFlag: () => ({ id: "prompt", flags: { test: payload } }),
+    actorByUuid: async () => actor, availableSpellSlots: () => [], itemUses, activeUseCount,
+    validateActiveUseLimit: () => {}, numberValue: Number, spellSlotSpendPlan,
+    normalizeConfig: () => ({ spellSlotBonuses: {}, maxActiveUses: 5 }),
+    currentRun: async () => ({ run }), readConfig: async () => ({ damageCap: 0.1, keepOneHp: true }),
+    bandWithDamage: () => ({ damage: 99 }),
+    nativeD20: async (_actor, modifier) => { rolledModifier = modifier; return { total: 15 }; },
+    applyResourceUpdates: async () => {}, failureDamage, participantDice: () => 12,
+    ChatMessage: { getSpeaker: () => ({}), create: async (data) => { sent = data; } },
+    renderParticipantResult: () => "", removeOpenCheckButton: () => {}
+  };
+  vm.createContext(context);
+  vm.runInContext(`${part("function passiveWithoutHp(", "\nasync function nativeD20(")}
+    ${part("class QuickBattlesApplication", "\nfunction renderParticipantResult(")}
+    this.App = QuickBattlesApplication;`, context);
+  const app = new context.App({ mode: "participant", checkId: "check" });
+  app.element = { querySelector: () => ({ value: "0" }), querySelectorAll: () => [] };
+  const prepared = await app._prepareParticipantContext();
+  assert.equal(prepared.passive.total, 3);
+  await app._submitParticipantCheck();
+  assert.equal(rolledModifier, 3);
+  assert.equal(sent.flags.test.details.passive.total, 3);
+  assert.equal(sent.flags.test.details.damage, 20);
 });
 
 test("GM party shows selection before checks and status cards with damage after checks", () => {
@@ -287,7 +328,7 @@ test("party damage is applied once, capped at one HP and disallowed after reset"
     },
     currentRun: async (id) => !id || id === run.id ? { run, message: null } : null,
     actorByUuid: async () => actor, persistRun: async () => {},
-    findMessageByFlag: () => null, capDamageAtOneHp: (damage, hp) => Math.min(damage, hp - 1),
+    findMessageByFlag: () => null, capDamageAtOneHp, readConfig: async () => ({ keepOneHp: true }),
     renderParticipantResult: () => "", mainApplication: null,
     ui: { notifications: { info() {} } }
   };
@@ -301,6 +342,61 @@ test("party damage is applied once, capped at one HP and disallowed after reset"
   run.status = "reset";
   await assert.rejects(() => context.legacy("run:Actor.1:check", { runId: "run", actorUuid: "Actor.1" }), /no longer available/);
   assert.equal(actorUpdates, 1);
+});
+
+test("damage application rechecks current HP and honors the run's survival setting", async () => {
+  for (const [keepOneHp, expected] of [[true, 1], [false, 0]]) {
+    const check = { status: "failed", checkId: "check", damage: 20, damageApplied: false };
+    const run = { id: "run", status: "checks-resolved", selectedEncounter: { keepOneHp }, checks: { "Actor.1": check } };
+    const actor = {
+      uuid: "Actor.1", name: "Hero", system: { attributes: { hp: { value: 3, max: 30 } } },
+      getFlag: () => [],
+      update: async (updates) => { actor.system.attributes.hp.value = updates["system.attributes.hp.value"]; }
+    };
+    const context = {
+      MODULE_ID: "test", damageInFlight: new Set(), game: {
+        user: { isGM: true, id: "gm" }, users: { activeGM: { id: "gm" } }, messages: { get: () => null }
+      },
+      currentRun: async () => ({ run, message: null }),
+      actorByUuid: async () => actor, persistRun: async () => {}, findMessageByFlag: () => null,
+      readConfig: async () => ({ keepOneHp: !keepOneHp }), capDamageAtOneHp,
+      mainApplication: null, ui: { notifications: { info() {} } }
+    };
+    vm.createContext(context);
+    vm.runInContext(`${part("async function applyPartyDamage(", "\nfunction bindChatActions(")}\nthis.apply = applyPartyDamage;`, context);
+    await context.apply("Actor.1");
+    assert.equal(actor.system.attributes.hp.value, expected);
+    assert.equal(check.damageApplied, true);
+  }
+});
+
+test("GM migrates legacy runs and snapshots Fate-band damage independently of encounter DC", async () => {
+  const check = { checkId: "check", status: "pending" };
+  const run = {
+    id: "run", status: "checks-pending", selectedEncounter: { dc: 25 },
+    fateResult: { difficulty: { min: 1, max: 20, label: "Custom", dc: 20 } },
+    checks: { "Actor.1": check }
+  };
+  const actor = { name: "Hero", system: { attributes: { hp: { max: 100, value: 100 } } }, testUserPermission: () => true };
+  const message = {
+    id: "result", rolls: [], update: async (updates) => { message.updates = updates; }
+  };
+  const context = {
+    MODULE_ID: "test", game: { users: { get: () => ({ isGM: true }) }, messages: { get: () => null } },
+    chatMessageAuthorId: () => "gm", actorByUuid: async () => actor, currentRun: async () => ({ run, message: null }),
+    persistRun: async () => {}, readConfig: async () => ({ damageCap: 0.3, keepOneHp: false }),
+    bandWithDamage: (band) => ({ ...band, damage: Math.round(band.dc / 5) }),
+    submittedRoll: () => 20, participantDice: () => 15, failureDamage,
+    renderParticipantResult: () => "", mainApplication: null
+  };
+  vm.createContext(context);
+  vm.runInContext(`${part("async function processParticipantSubmission(", "\nasync function applyPartyDamage(")}\nthis.process = processParticipantSubmission;`, context);
+  await context.process(message, { runId: "run", checkId: "check", actorUuid: "Actor.1", details: {} });
+  assert.equal(run.selectedEncounter.damage, 4);
+  assert.equal(run.selectedEncounter.damageCap, 0.3);
+  assert.equal(run.selectedEncounter.keepOneHp, false);
+  assert.equal(check.damage, 20);
+  assert.equal(message.updates["flags.test.details"].dc, 25);
 });
 
 test("damage recovery honors the actor's operation flag and rejects non-active GMs", async () => {
@@ -353,7 +449,7 @@ test("pending legacy damage control remains usable by the active GM", async () =
     },
     currentRun: async () => ({ run, message: null }),
     actorByUuid: async () => actor, persistRun: async () => {},
-    findMessageByFlag: () => control, capDamageAtOneHp: (damage, hp) => Math.min(damage, hp - 1),
+    findMessageByFlag: () => control, capDamageAtOneHp, readConfig: async () => ({ keepOneHp: true }),
     mainApplication: null, ui: { notifications: { info() {} } }
   };
   vm.createContext(context);

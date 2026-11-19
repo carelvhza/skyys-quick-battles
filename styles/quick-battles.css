@@ -557,11 +557,11 @@
 }
 
 .qb-config-rows .qb-difficulty-row {
-  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) auto;
   align-items: end;
   border: none !important;
   margin: 0 !important;
-  gap: 12px !important;
+  gap: 6px !important;
 }
 
 .qb-config-rows .qb-feature-row {

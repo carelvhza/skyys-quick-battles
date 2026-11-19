@@ -246,7 +246,7 @@ test("participant checks close recovery after submission and restrict damage to 
   assert.match(applicationSource, /Only the active GM can apply damage/);
   assert.match(applicationSource, /appliedDamageIds/);
   assert.match(applicationSource, /check\.damageApplied = true/);
-  assert.match(applicationSource, /capDamageAtOneHp\(payload\.damage, currentHp\)/);
+  assert.match(applicationSource, /capDamageAtOneHp\(payload\.damage, currentHp, active\.run\.selectedEncounter\?\.keepOneHp \?\? config\.keepOneHp\)/);
   assert.match(applicationSource, /Hooks\.on\("renderChatMessage", hideSubmittedCheckAction\)/);
   assert.match(applicationSource, /if \(prompt\) await prompt\.delete\(\)/);
   assert.match(applicationSource, /await control\.delete\(\)/);
@@ -290,7 +290,7 @@ test("the supplied feat catalog is parsed in full, including semicolon-containin
     ["Armor of Hexes", "Passive", "Low"],
     ["Pact Boon: Pact of the Blade", "Passive", "Low"],
     ["Eldritch Invocation: Sign of Ill Omen", "Active", "Low"],
-    ["Eldritch Invocation: Thirsting Blade", "Passive", "Medium"],
+    ["Eldritch Invocation: Thirsting Blade", "Passive", "Low"],
     ["Eldritch Invocation: Improved Pact Weapon", "Passive", "Low"],
     ["Eldritch Invocation: Eldritch Mind", "Passive", "Low"],
     ["Eldritch Invocation: Lifedrinker", "Passive", "Low"],
@@ -309,7 +309,10 @@ test("the supplied feat catalog is parsed in full, including semicolon-containin
     ["Brutal Critical (1 die)", "Passive", "Low"],
     ["Totem Spirit: Crocodile", "Passive", "Medium"],
     ["Great Weapon Fighting", "Passive", "Low"],
-    ["Polearm Master", "Passive", "Medium"]
+    ["Polearm Master", "Passive", "Low"],
+    ["Extra Attack", "Passive", "Low"],
+    ["Sharpshooter", "Passive", "Medium"],
+    ["Great Weapon Master", "Passive", "Medium"]
   ];
   assert.deepEqual(
     expected.map(([name]) => {
@@ -447,10 +450,9 @@ test("passive bonus calculation uses only the highest ability and other configur
   assert.deepEqual(passive, {
     ability: 3,
     abilityName: "STR",
-    hp: 1,
     armor: 2,
     catalog: 4,
-    total: 10
+    total: 9
   });
 });
 
@@ -463,9 +465,11 @@ test("armor class bonuses follow every configured boundary", () => {
   }
 });
 
-test("current HP bonus increases by one per 50 hit points", () => {
-  for (const [currentHp, expectedBonus] of [[49, 0], [50, 1], [99, 1], [100, 2]]) {
-    assert.equal(calculatePassiveBonuses({ currentHp }).hp, expectedBonus);
+test("current HP does not affect the passive bonus", () => {
+  for (const currentHp of [0, 49, 50, 99, 100, 200]) {
+    const result = calculatePassiveBonuses({ currentHp, ac: 16 });
+    assert.equal(result.total, 0);
+    assert.equal("hp" in result, false);
   }
 });
 
@@ -586,26 +590,29 @@ test("chat submission author lookup prefers the Foundry author identity", () => 
 
 test("default difficulty bands use the exact encounter thresholds", () => {
   const bands = [
-    { min: 1, max: 7, label: "Easy", dc: 19 },
-    { min: 8, max: 16, label: "Medium", dc: 23 },
-    { min: 17, max: 18, label: "Hard", dc: 29 },
-    { min: 19, max: 19, label: "Deadly", dc: 34 },
-    { min: 20, max: 20, label: "Combat", dc: 0, combat: true }
+    { min: 1, max: 7, label: "Easy", dc: 19, damage: 4 },
+    { min: 8, max: 16, label: "Medium", dc: 23, damage: 6 },
+    { min: 17, max: 18, label: "Hard", dc: 28, damage: 8 },
+    { min: 19, max: 19, label: "Deadly", dc: 34, damage: 10 },
+    { min: 20, max: 20, label: "Combat!", dc: 0, damage: 0, combat: true }
   ];
   assert.deepEqual([1, 7, 8, 16, 17, 18, 19, 20].map((roll) => {
-    const { min, max, label, dc } = encounterBand(roll, bands);
-    return { min, max, label, dc };
+    const { min, max, label, dc, damage } = encounterBand(roll, bands);
+    return { min, max, label, dc, damage };
   }), [
-    { min: 1, max: 7, label: "Easy", dc: 19 },
-    { min: 1, max: 7, label: "Easy", dc: 19 },
-    { min: 8, max: 16, label: "Medium", dc: 23 },
-    { min: 8, max: 16, label: "Medium", dc: 23 },
-    { min: 17, max: 18, label: "Hard", dc: 29 },
-    { min: 17, max: 18, label: "Hard", dc: 29 },
-    { min: 19, max: 19, label: "Deadly", dc: 34 },
-    { min: 20, max: 20, label: "Combat", dc: 0 }
+    { min: 1, max: 7, label: "Easy", dc: 19, damage: 4 },
+    { min: 1, max: 7, label: "Easy", dc: 19, damage: 4 },
+    { min: 8, max: 16, label: "Medium", dc: 23, damage: 6 },
+    { min: 8, max: 16, label: "Medium", dc: 23, damage: 6 },
+    { min: 17, max: 18, label: "Hard", dc: 28, damage: 8 },
+    { min: 17, max: 18, label: "Hard", dc: 28, damage: 8 },
+    { min: 19, max: 19, label: "Deadly", dc: 34, damage: 10 },
+    { min: 20, max: 20, label: "Combat!", dc: 0, damage: 0 }
   ]);
-  assert.match(applicationSource, /\{ min: 1, max: 7, label: "Easy", dc: 19 \}[\s\S]*\{ min: 8, max: 16, label: "Medium", dc: 23 \}[\s\S]*\{ min: 17, max: 18, label: "Hard", dc: 29 \}[\s\S]*\{ min: 19, max: 19, label: "Deadly", dc: 34 \}[\s\S]*\{ min: 20, max: 20, label: "Combat", dc: 0, combat: true \}/);
+  for (const band of bands) {
+    const fields = Object.entries(band).map(([key, value]) => `${key}: ${typeof value === "string" ? `"${value}"` : value}`).join(", ");
+    assert.ok(applicationSource.includes(`{ ${fields} }`));
+  }
 });
 
 test("the configured active feat and spell limit counts uses together", () => {
@@ -616,16 +623,18 @@ test("the configured active feat and spell limit counts uses together", () => {
 });
 
 test("capped failure damage uses the specified thresholds", () => {
-  assert.deepEqual(failureDamage(101, 10, 15, 1), { margin: 5, fraction: 0.25, damage: 25 });
-  assert.deepEqual(failureDamage(80, 1, 100, 0.35), { margin: 99, fraction: 0.35, damage: 28 });
+  assert.deepEqual(failureDamage(100, 10, 15, 4), { margin: 5, fraction: 0.2, damage: 20 });
+  assert.deepEqual(failureDamage(80, 1, 100, 6, 0.35), { margin: 99, fraction: 0.35, damage: 28 });
+  assert.deepEqual(failureDamage(100, 10, 15, 0), { margin: 5, fraction: 0, damage: 0 });
+  assert.throws(() => failureDamage(100, 1, 10, -1), /non-negative whole number/);
 });
 
 test("failure damage is capped to leave at least one current hit point", () => {
-  assert.deepEqual(failureDamage(100, 0, 100, 1, 10), { margin: 100, fraction: 0.09, damage: 9 });
-  assert.deepEqual(failureDamage(100, 0, 100, 0.25, 10), { margin: 100, fraction: 0.09, damage: 9 });
-  assert.deepEqual(failureDamage(100, 0, 100, 1, 1), { margin: 100, fraction: 0, damage: 0 });
-  assert.deepEqual(failureDamage(100, 0, 100, 1, 0), { margin: 100, fraction: 0, damage: 0 });
-  assert.deepEqual(failureDamage(100, 0, 100, 1, 50), { margin: 100, fraction: 0.49, damage: 49 });
+  assert.deepEqual(failureDamage(100, 0, 100, 4, 1, 10), { margin: 100, fraction: 0.09, damage: 9 });
+  assert.deepEqual(failureDamage(100, 0, 100, 4, 0.25, 10), { margin: 100, fraction: 0.09, damage: 9 });
+  assert.deepEqual(failureDamage(100, 0, 100, 4, 1, 1), { margin: 100, fraction: 0, damage: 0 });
+  assert.deepEqual(failureDamage(100, 0, 100, 4, 1, 0), { margin: 100, fraction: 0, damage: 0 });
+  assert.deepEqual(failureDamage(100, 0, 100, 4, 1, 10, false), { margin: 100, fraction: 0.1, damage: 10 });
 });
 
 test("damage application cap never raises HP and accounts for intervening damage", () => {
@@ -634,6 +643,8 @@ test("damage application cap never raises HP and accounts for intervening damage
   assert.equal(capDamageAtOneHp(20, 0), 0);
   assert.equal(capDamageAtOneHp(0, 10), 0);
   assert.equal(capDamageAtOneHp(4, 10), 4);
+  assert.equal(capDamageAtOneHp(20, 10, false), 10);
+  assert.equal(capDamageAtOneHp(20, 0, false), 0);
 });
 
 test("native use data supports current-value and spent counters", () => {
