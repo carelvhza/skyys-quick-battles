@@ -544,6 +544,48 @@ test("resource updates persist D&D 5e item uses and spell-slot values", async ()
   assert.equal(actor.system.spells.spell1.value, 1);
 });
 
+test("resource updates survive actor refreshes and update-payload mutation", async () => {
+  const createItem = () => ({
+    id: "feature",
+    name: "Bardic Inspiration",
+    system: { uses: { value: 2, max: 3 } },
+    async update(changes) {
+      for (const [path, value] of Object.entries(changes)) {
+        const parts = path.split(".");
+        const key = parts.pop();
+        parts.reduce((object, part) => object[part], this)[key] = value;
+      }
+    }
+  });
+  const originalItem = createItem();
+  const actor = {
+    id: "actor",
+    items: new Map([[originalItem.id, originalItem]]),
+    system: { spells: { spell1: { value: 1, max: 1 } } },
+    async update(updates) {
+      for (const [path, value] of Object.entries(updates)) {
+        if (path === "_id") continue;
+        const parts = path.split(".");
+        const key = parts.pop();
+        parts.reduce((object, part) => object[part], this)[key] = value;
+      }
+      this.items = new Map([["feature", createItem()]]);
+      updates._id = this.id;
+      return this;
+    }
+  };
+
+  await applyResourceUpdates(actor, [
+    { _id: "feature", "system.uses.value": 1 }
+  ], {
+    "system.spells.spell1.value": 0
+  });
+
+  assert.equal(actor.items.get("feature").system.uses.value, 1);
+  assert.equal(actor.system.spells.spell1.value, 0);
+  assert.equal(originalItem.system.uses.value, 2);
+});
+
 test("resource update failures and unpersisted paths are surfaced", async () => {
   const permissionDeniedItem = {
     name: "Lucky",
