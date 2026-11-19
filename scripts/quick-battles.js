@@ -569,7 +569,8 @@ function hideSubmittedCheckAction(message, html) {
 function updateActiveBonusPreview(element) {
   const preview = element.querySelector("[data-active-bonus-preview]");
   if (!preview) return;
-  const entries = Array.from(element.querySelectorAll("[data-bonus-count]")).map((input) => ({
+  const inputs = Array.from(element.querySelectorAll("[data-bonus-count]"));
+  const entries = inputs.map((input) => ({
     count: input.value,
     bonusPerUse: input.dataset.bonusPerUse
   }));
@@ -578,6 +579,14 @@ function updateActiveBonusPreview(element) {
   const limit = Number(preview.dataset.maxActiveUses);
   const feedback = preview.querySelector("[data-active-use-feedback]");
   const overLimit = count > limit;
+  for (const input of inputs) {
+    const stepper = input.closest(".qb-resource-stepper");
+    if (!stepper) continue;
+    const value = Number(input.value);
+    stepper.querySelector('[data-resource-step="-1"]').disabled = !Number.isFinite(value) || value <= Number(input.min);
+    stepper.querySelector('[data-resource-step="1"]').disabled = !Number.isFinite(value)
+      || value >= Number(input.max) || count >= limit;
+  }
   const passive = Number(element.querySelector("[data-passive-bonus]")?.dataset.passiveBonus ?? 0);
   const combined = passive + bonus;
   const submit = element.querySelector('[data-app-action="submit-check"]');
@@ -1446,7 +1455,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
         available: Math.floor(resourceAvailable / resourceCostPerUse),
         ...(option.resourceCostPerUse ? { resourceAvailable } : {})
       };
-    }).filter((option) => option.available > 0);
+    });
     const currentSpellSlots = availableSpellSlots(actor.system?.spells);
     const spellSlots = expected.spellSlots.flatMap((slot) => {
       const current = currentSpellSlots.find((entry) => entry.level === slot.level);
@@ -1479,6 +1488,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       const step = event.target.closest("[data-resource-step]");
       if (step && this.mode === "participant") {
         event.preventDefault();
+        if (step.disabled) return;
         const input = step.closest(".qb-resource-stepper").querySelector("[data-bonus-count]");
         const min = Number(input.min);
         const max = Number(input.max);

@@ -439,6 +439,14 @@ test("only catalogued actor items contribute passive bonuses or selectable activ
     { id: "lay-on-hands", name: "Lay on Hands", system: { uses: { max: 60, value: 59 } } }
   ]);
   assert.equal(partiallySpent.activeEntries[0].available, 2);
+  const depleted = selectedCatalogBonuses(catalog, [
+    { id: "lucky", name: "Lucky", system: { uses: { max: 3, spent: 3 } } },
+    { id: "lay-on-hands", name: "Lay on Hands", system: { uses: { max: 60, value: 19 } } }
+  ]);
+  assert.deepEqual(depleted.activeEntries.map(({ name, available }) => ({ name, available })), [
+    { name: "Lucky", available: 0 },
+    { name: "Lay on Hands", available: 0 }
+  ]);
 });
 
 test("passive bonus calculation uses only the highest ability and other configured components", () => {

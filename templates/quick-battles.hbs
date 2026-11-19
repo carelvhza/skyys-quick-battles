@@ -46,15 +46,15 @@
               <div class="qb-resource-row">
                 <span>{{name}} <small>+{{bonusPerUse}} each · {{#if resourceCostPerUse}}{{available}} ({{resourceAvailable}}/{{resourceCostPerUse}}){{else}}{{available}}{{/if}} available</small></span>
                 <div class="qb-resource-stepper">
-                  <button type="button" data-resource-step="-1" aria-label="Decrease {{name}} uses">−</button>
-                  <input name="active-{{itemId}}" type="number" min="0" max="{{available}}" value="0" data-bonus-count data-bonus-per-use="{{bonusPerUse}}" aria-label="{{name}} uses" />
-                  <button type="button" data-resource-step="1" aria-label="Increase {{name}} uses">+</button>
+                  <button type="button" data-resource-step="-1" aria-label="Decrease {{name}} uses" disabled>−</button>
+                  <input name="active-{{itemId}}" type="number" min="0" max="{{available}}" value="0" data-bonus-count data-bonus-per-use="{{bonusPerUse}}" aria-label="{{name}} uses" {{#unless available}}disabled{{/unless}} />
+                  <button type="button" data-resource-step="1" aria-label="Increase {{name}} uses" {{#unless available}}disabled{{/unless}}>+</button>
                 </div>
               </div>
             {{/each}}
           </div>
         {{else}}
-          <p class="qb-muted">No catalogued active feature uses are available.</p>
+          <p class="qb-muted">No catalogued active features found.</p>
         {{/if}}
       </div>
 
@@ -63,10 +63,14 @@
         {{#if spellSlots.length}}
           <div class="qb-resource-list">
             {{#each spellSlots}}
-              <label class="qb-resource-row">
+              <div class="qb-resource-row">
                 <span>Level {{level}} <small>+{{bonus}} each · {{available}} available</small></span>
-                <input name="slot-{{level}}" type="number" min="0" max="{{available}}" value="0" data-bonus-count data-bonus-per-use="{{bonus}}" {{#unless available}}disabled{{/unless}} />
-              </label>
+                <div class="qb-resource-stepper">
+                  <button type="button" data-resource-step="-1" aria-label="Decrease level {{level}} spell slots" disabled>−</button>
+                  <input name="slot-{{level}}" type="number" min="0" max="{{available}}" value="0" data-bonus-count data-bonus-per-use="{{bonus}}" aria-label="Level {{level}} spell slots" {{#unless available}}disabled{{/unless}} />
+                  <button type="button" data-resource-step="1" aria-label="Increase level {{level}} spell slots" {{#unless available}}disabled{{/unless}}>+</button>
+                </div>
+              </div>
             {{/each}}
           </div>
         {{else}}
