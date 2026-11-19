@@ -1,6 +1,38 @@
 export const ABILITY_ORDER = ["str", "dex", "int", "wis", "cha"];
 
 const RATING_BONUSES = { Low: 1, Medium: 2, High: 3 };
+const CATALOG_ALIASES = new Map([
+  ["armor of hexes (hexblade)", "armor of hexes"],
+  ["brutal critical", "brutal critical (1 die)"],
+  ["dread ambusher (gloom stalker)", "dread ambusher"],
+  ["eldritch mind (eldritch invocation)", "eldritch invocation: eldritch mind"],
+  ["improved pact weapon", "eldritch invocation: improved pact weapon"],
+  ["improved pact weapon (eldritch invocation)", "eldritch invocation: improved pact weapon"],
+  ["lifedrinker", "eldritch invocation: lifedrinker"],
+  ["lifedrinker (eldritch invocation)", "eldritch invocation: lifedrinker"],
+  ["relentless hex", "eldritch invocation: relentless hex"],
+  ["relentless hex (eldritch invocation)", "eldritch invocation: relentless hex"],
+  ["sign of ill omen", "eldritch invocation: sign of ill omen"],
+  ["sign of ill omen (eldritch invocation)", "eldritch invocation: sign of ill omen"],
+  ["thirsting blade", "eldritch invocation: thirsting blade"],
+  ["thirsting blade (eldritch invocation)", "eldritch invocation: thirsting blade"],
+  ["great weapon fighting (fighting style)", "great weapon fighting"],
+  ["fighting style: great weapon fighting", "great weapon fighting"],
+  ["archery", "fighting style: archery"],
+  ["hexblade's curse (hexblade)", "hexblade's curse"],
+  ["iron mind (gloom stalker)", "iron mind"],
+  ["pact of the blade", "pact boon: pact of the blade"],
+  ["relentless avenger (vengeance)", "relentless avenger"],
+  ["fell-handed", "fell handed"],
+  ["totem spirit (crocodile)", "totem spirit: crocodile"],
+  ["fey touched (misty step)", "fey touched: misty step"],
+  ["fey touched (silvery barbs)", "fey touched: silvery barbs"]
+]);
+
+function catalogNameKey(name) {
+  const key = String(name).trim().toLocaleLowerCase();
+  return CATALOG_ALIASES.get(key) ?? key;
+}
 
 function finiteNumber(value, fallback = 0) {
   const number = Number(value);
@@ -63,14 +95,16 @@ export function parseFeatCatalog(csvText) {
 }
 
 export function mergeCatalog(baseCatalog, overrides = []) {
-  const entries = new Map(baseCatalog.map((entry) => [entry.name.toLocaleLowerCase(), { ...entry }]));
+  const entries = new Map(baseCatalog.map((entry) => [catalogNameKey(entry.name), { ...entry }]));
 
   for (const override of overrides) {
     if (!override || typeof override.name !== "string" || !override.name.trim()) {
       throw new Error("Every catalog override needs a feature name.");
     }
     const name = override.name.trim();
-    const id = name.toLocaleLowerCase();
+    const id = catalogNameKey(name);
+    const canonicalName = [...baseCatalog, ...entries.values()]
+      .find((entry) => catalogNameKey(entry.name) === id)?.name ?? name;
     if (override.disabled === true) {
       entries.delete(id);
       continue;
@@ -96,7 +130,7 @@ export function mergeCatalog(baseCatalog, overrides = []) {
       ...existing,
       ...override,
       id,
-      name,
+      name: canonicalName,
       type,
       rating,
       bonus,
@@ -133,11 +167,17 @@ export function highestAbility(abilities = {}) {
 export function calculatePassiveBonuses({ abilities = {}, currentHp = 0, ac = 0, catalogBonus = 0 } = {}) {
   const bestAbility = highestAbility(abilities);
   const armorClass = finiteNumber(ac, 0);
+  const armorBonus = armorClass >= 22 ? 2
+    : armorClass >= 19 ? 1
+      : armorClass >= 16 ? 0
+        : armorClass >= 14 ? -1
+          : armorClass >= 12 ? -2
+            : -3;
   const bonuses = {
     ability: bestAbility.modifier,
     abilityName: bestAbility.key.toUpperCase(),
     hp: Math.floor(finiteNumber(currentHp, 0) / 50),
-    armor: armorClass >= 22 ? 2 : armorClass >= 19 ? 1 : 0,
+    armor: armorBonus,
     catalog: finiteNumber(catalogBonus, 0)
   };
   bonuses.total = bonuses.ability + bonuses.hp + bonuses.armor + bonuses.catalog;
@@ -388,14 +428,21 @@ export async function applyResourceUpdates(actor, itemUpdates = [], actorUpdates
 }
 
 export function selectedCatalogBonuses(catalog, actorItems) {
-  const itemsByName = new Map(actorItems.map((item) => [item.name.toLocaleLowerCase(), item]));
   const passiveEntries = [];
   const activeEntries = [];
+  const countedEntries = new Set();
   let passiveBonus = 0;
 
   for (const entry of catalog) {
-    const item = itemsByName.get(entry.name.toLocaleLowerCase());
+    const key = catalogNameKey(entry.name);
+    if (key === "fey touched") continue;
+    if (countedEntries.has(key)) continue;
+    const matches = actorItems.filter((item) => catalogNameKey(item.name) === key);
+    const item = matches.find((candidate) => (
+      candidate.name.trim().toLocaleLowerCase() === entry.name.trim().toLocaleLowerCase()
+    )) ?? matches[0];
     if (!item) continue;
+    countedEntries.add(key);
 
     if (entry.type === "Passive") {
       passiveBonus += finiteNumber(entry.bonus);

@@ -170,7 +170,7 @@ test("older saved configurations inherit the new active-use default", () => {
 });
 
 test("native D20 roll configurations initialize the D&D 5e roll options", () => {
-  assert.match(applicationSource, /rolls: \[\{ parts: d20ModifierParts\(modifier\),[\s\S]*?options: \{\}/);
+  assert.match(applicationSource, /rolls: \[\{ parts: Array\.isArray\(modifier\) \? modifier\.flatMap\(d20ModifierParts\) : d20ModifierParts\(modifier\),[\s\S]*?options: \{\}/);
   assert.deepEqual(d20ModifierParts(0), []);
   assert.deepEqual(d20ModifierParts(3), ["3"]);
   assert.deepEqual(d20ModifierParts(-2), ["-2"]);
@@ -253,7 +253,7 @@ test("participant checks close recovery after submission and restrict damage to 
   assert.match(mainTemplate, /class="qb-main-layout(?:\s|")/);
   assert.match(mainTemplate, /{{#if showCurrentRun}}[\s\S]*class="qb-secondary-column"[\s\S]*{{\/if}}/);
   assert.match(mainTemplate, /qb-main-layout-no-opposition/);
-  assert.match(mainTemplate, /class="qb-participant-section"/);
+  assert.match(mainTemplate, /class="qb-section qb-participant-section"/);
   assert.match(mainTemplate, /qb-stage-threat/);
   assert.match(applicationSource, /qb-encounter-difficulty/);
   assert.doesNotMatch(applicationSource, /Resources spent:/);
@@ -278,10 +278,112 @@ test("participant bonus preview updates from resource-count input changes", () =
 
 test("the supplied feat catalog is parsed in full, including semicolon-containing descriptions", () => {
   const catalog = parseFeatCatalog(catalogText);
-  assert.equal(catalog.length, 374);
+  assert.equal(catalog.length, 383);
   assert.equal(catalog.find((entry) => entry.name === "Actor").bonus, 1);
   assert.equal(catalog.find((entry) => entry.name === "Alert").description, "+5 to initiative; immune to surprise while conscious; no advantage for hidden attackers");
   assert.equal(catalog.find((entry) => entry.name === "War Caster").bonus, 3);
+  assert.equal(catalog.some((entry) => [
+    "Divine Sense", "Hide in Plain Sight", "Fey Touched", "Eldritch Smite"
+  ].includes(entry.name)), false);
+  const expected = [
+    ["Hexblade's Curse", "Active", "Low"],
+    ["Armor of Hexes", "Passive", "Low"],
+    ["Pact Boon: Pact of the Blade", "Passive", "Low"],
+    ["Eldritch Invocation: Sign of Ill Omen", "Active", "Low"],
+    ["Eldritch Invocation: Thirsting Blade", "Passive", "Medium"],
+    ["Eldritch Invocation: Improved Pact Weapon", "Passive", "Low"],
+    ["Eldritch Invocation: Eldritch Mind", "Passive", "Low"],
+    ["Eldritch Invocation: Lifedrinker", "Passive", "Low"],
+    ["Eldritch Invocation: Relentless Hex", "Passive", "Low"],
+    ["Nature's Veil", "Active", "Medium"],
+    ["Fighting Style: Archery", "Passive", "Low"],
+    ["Dread Ambusher", "Passive", "Low"],
+    ["Iron Mind", "Passive", "Low"],
+    ["Lucky", "Active", "Medium"],
+    ["Fey Touched: Misty Step", "Active", "Low"],
+    ["Fey Touched: Silvery Barbs", "Active", "Low"],
+    ["Channel Divinity", "Active", "Medium"],
+    ["Relentless Avenger", "Passive", "Low"],
+    ["Breath Weapon", "Active", "Medium"],
+    ["Fell Handed", "Passive", "Low"],
+    ["Brutal Critical (1 die)", "Passive", "Low"],
+    ["Totem Spirit: Crocodile", "Passive", "High"],
+    ["Great Weapon Fighting", "Passive", "Low"],
+    ["Polearm Master", "Passive", "Medium"]
+  ];
+  assert.deepEqual(
+    expected.map(([name]) => {
+      const entries = catalog.filter((entry) => entry.name === name);
+      assert.equal(entries.length, 1, `${name} should appear exactly once`);
+      const { name: actualName, type, rating } = entries[0];
+      return [actualName, type, rating];
+    }),
+    expected
+  );
+  assert.match(catalog.find((entry) => entry.name === "Eldritch Invocation: Sign of Ill Omen").description, /Bestow Curse/);
+  assert.doesNotMatch(catalog.find((entry) => entry.name === "Eldritch Invocation: Sign of Ill Omen").description, /Bane/);
+  assert.match(catalog.find((entry) => entry.name === "Fell Handed").description, /handaxe battleaxe greataxe warhammer and maul/);
+  assert.match(catalog.find((entry) => entry.name === "Totem Spirit: Crocodile").description, /while raging.*resistance to all damage except psychic/i);
+  assert.equal(catalog.find((entry) => entry.name === "Nature's Veil").category, "Ranger");
+  assert.match(catalog.find((entry) => entry.name === "Breath Weapon").description, /saving throw depend on ancestry and racial variant/);
+  assert.match(catalog.find((entry) => entry.name === "Relentless Avenger").description, /without provoking opportunity attacks$/);
+});
+
+test("catalog aliases apply legacy overrides and do not double-count old and new actor items", () => {
+  const catalog = parseFeatCatalog(catalogText);
+  const aliases = [
+    ["Armor of Hexes (Hexblade)", "Armor of Hexes"],
+    ["Hexblade's Curse (Hexblade)", "Hexblade's Curse"],
+    ["Pact of the Blade", "Pact Boon: Pact of the Blade"],
+    ["Sign of Ill Omen (Eldritch Invocation)", "Eldritch Invocation: Sign of Ill Omen"],
+    ["Sign of Ill Omen", "Eldritch Invocation: Sign of Ill Omen"],
+    ["Thirsting Blade", "Eldritch Invocation: Thirsting Blade"],
+    ["Improved Pact Weapon", "Eldritch Invocation: Improved Pact Weapon"],
+    ["Eldritch Mind (Eldritch Invocation)", "Eldritch Invocation: Eldritch Mind"],
+    ["Lifedrinker", "Eldritch Invocation: Lifedrinker"],
+    ["Relentless Hex", "Eldritch Invocation: Relentless Hex"],
+    ["Nature's Veil", "Nature's Veil"],
+    ["Archery", "Fighting Style: Archery"],
+    ["Dread Ambusher (Gloom Stalker)", "Dread Ambusher"],
+    ["Iron Mind (Gloom Stalker)", "Iron Mind"],
+    ["Lucky", "Lucky"],
+    ["Fey Touched (Misty Step)", "Fey Touched: Misty Step"],
+    ["Fey Touched (Silvery Barbs)", "Fey Touched: Silvery Barbs"],
+    ["Channel Divinity", "Channel Divinity"],
+    ["Relentless Avenger (Vengeance)", "Relentless Avenger"],
+    ["Breath Weapon", "Breath Weapon"],
+    ["Fell-Handed", "Fell Handed"],
+    ["Brutal Critical", "Brutal Critical (1 die)"],
+    ["Totem Spirit (Crocodile)", "Totem Spirit: Crocodile"],
+    ["Great Weapon Fighting (Fighting Style)", "Great Weapon Fighting"],
+    ["Fighting Style: Great Weapon Fighting", "Great Weapon Fighting"],
+    ["Polearm Master", "Polearm Master"]
+  ];
+  for (const [legacyName, canonicalName] of aliases) {
+    const original = catalog.find((entry) => entry.name === canonicalName);
+    assert.ok(original, `Missing canonical entry ${canonicalName}`);
+    const merged = mergeCatalog(catalog, [{ name: legacyName, rating: "High" }]);
+    assert.equal(merged.filter((entry) => entry.name === canonicalName).length, 1, `${legacyName} override should not duplicate ${canonicalName}`);
+    assert.equal(merged.find((entry) => entry.name === canonicalName).rating, "High", `${legacyName} override should update ${canonicalName}`);
+    const system = original.type === "Active" ? { uses: { value: 1, max: 1 } } : {};
+    const selected = selectedCatalogBonuses(merged, [
+      { id: "legacy", name: legacyName, system },
+      { id: "canonical", name: canonicalName, system }
+    ]);
+    const selectedNames = original.type === "Active"
+      ? selected.activeEntries.map(({ name }) => name)
+      : selected.passiveEntries.map(({ name }) => name);
+    assert.equal(selectedNames.filter((name) => name === canonicalName).length, 1, `${legacyName} and ${canonicalName} must not double-count`);
+  }
+  const genericFey = selectedCatalogBonuses(catalog, [
+    { id: "fey-generic", name: "Fey Touched", system: { uses: { value: 1, max: 1 } } },
+    { id: "fey-misty", name: "Fey Touched: Misty Step", system: { uses: { value: 1, max: 1 } } },
+    { id: "fey-barbs", name: "Fey Touched: Silvery Barbs", system: { uses: { value: 1, max: 1 } } }
+  ]);
+  assert.deepEqual(genericFey.activeEntries.map(({ name }) => name), [
+    "Fey Touched: Misty Step",
+    "Fey Touched: Silvery Barbs"
+  ]);
 });
 
 test("only catalogued actor items contribute passive bonuses or selectable active uses", () => {
@@ -337,6 +439,15 @@ test("passive bonus calculation uses only the highest ability and other configur
     catalog: 4,
     total: 10
   });
+});
+
+test("armor class bonuses follow every configured boundary", () => {
+  for (const [ac, expected] of [
+    [22, 2], [21, 1], [19, 1], [18, 0], [16, 0],
+    [15, -1], [14, -1], [13, -2], [12, -2], [11, -3]
+  ]) {
+    assert.equal(calculatePassiveBonuses({ ac }).armor, expected, `AC ${ac}`);
+  }
 });
 
 test("current HP bonus increases by one per 50 hit points", () => {

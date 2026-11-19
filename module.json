@@ -2,7 +2,7 @@
   "id": "skyys-quick-battles",
   "title": "Skyy's Quick Battles",
   "description": "A small module to allow players to roll single rolls with bonuses based on passive and spent resources, to resolve a battle in one roll.",
-  "version": "0.9.1",
+  "version": "0.9.3",
   "compatibility": {
     "minimum": "14",
     "verified": "14"

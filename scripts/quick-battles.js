@@ -98,7 +98,7 @@ async function nativeD20(actor, modifier, flavor) {
   if (!rollClass?.build) throw new Error("D&D 5e's native D20 roll workflow is unavailable.");
   const rolls = await rollClass.build(
     {
-      rolls: [{ parts: d20ModifierParts(modifier), data: actor?.getRollData?.() ?? {}, options: {} }],
+      rolls: [{ parts: Array.isArray(modifier) ? modifier.flatMap(d20ModifierParts) : d20ModifierParts(modifier), data: actor?.getRollData?.() ?? {}, options: {} }],
       subject: actor ?? undefined,
       hookNames: ["D20Test"]
     },
@@ -501,6 +501,14 @@ function displayRollResult(run) {
   return `<section class="qb-result"><strong>${escapeHtml(result.label)}</strong><div>${result.total} vs DC ${run.fate.dc}</div>${difficulty}${watch}${threatType}</section>`;
 }
 
+function resolvedFateCard(run) {
+  const result = run.fateResult;
+  return chatCard(
+    `<h3>Quick Battles · Fate check resolved</h3><p>${escapeHtml(result.label)}: ${result.total} vs DC ${run.fate.dc}.</p>`,
+    result.failed ? "qb-fate-threat" : "qb-fate-safe"
+  );
+}
+
 function chatCard(content, classes = "") {
   return `<article class="qb-chat ${classes}">${content}</article>`;
 }
@@ -541,6 +549,8 @@ function updateActiveBonusPreview(element) {
   const limit = Number(preview.dataset.maxActiveUses);
   const feedback = preview.querySelector("[data-active-use-feedback]");
   const overLimit = count > limit;
+  const submit = element.querySelector('[data-app-action="submit-check"]');
+  if (submit) submit.disabled = overLimit;
   preview.querySelector("[data-bonus-total]").textContent = `${bonus >= 0 ? "+" : ""}${bonus}`;
   feedback.textContent = overLimit
     ? `${count} selected; maximum is ${limit}. Reduce selected uses before rolling.`
@@ -1297,7 +1307,8 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     super({
       ...options,
       id: options.id ?? (isParticipant ? `${MODULE_ID}-check-${options.checkId}` : `${MODULE_ID}-window`),
-      position: { width: isParticipant ? 500 : 960, height: "auto", ...options.position },
+      classes: isParticipant ? ["quick-battles-app", "qb-participant-app"] : ["quick-battles-app"],
+      position: { width: isParticipant ? 500 : 480, height: "auto", ...options.position },
       window: { title: isParticipant ? "Quick Battle check" : "Quick Battles", resizable: true }
     });
     this.mode = options.mode ?? "gm";
@@ -1320,11 +1331,21 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     const checkedStatuses = run?.checks ?? {};
     const actors = await Promise.all(config.players.map(async (entry) => {
       const actor = await actorByUuid(entry.actorUuid);
+      const check = checkedStatuses[entry.actorUuid];
+      const level = Array.from(actor.items ?? [])
+        .filter((item) => item.type === "class")
+        .reduce((total, item) => total + (Number(item.system?.levels) || 0), 0);
       return {
         uuid: entry.actorUuid,
         name: actor.name,
+        img: actor.img || "icons/svg/mystery-man.svg",
+        level,
         defaultSelected: selectedIds.has(entry.actorUuid),
-        checkStatus: checkedStatuses[entry.actorUuid]?.statusLabel ?? ""
+        checkStatus: check?.statusLabel ?? "",
+        status: check?.status ?? "pending",
+        damage: check?.damage ?? 0,
+        damageApplied: check?.damageApplied ?? false,
+        canApplyDamage: check?.status === "failed" && check.damage > 0 && !check.damageApplied
       };
     }));
     actors.sort((left, right) => left.name.localeCompare(right.name));
@@ -1358,9 +1379,15 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       rolls,
       canChooseEncounter: run?.status === "fate-resolved" && run.fateResult?.failed === true,
       canStartChecks: run?.status === "encounter-selected",
-      canCancelRun: run?.status !== "cancelled",
-      showCurrentRun: isRunActive(run),
-      state: run ? { ...run, statusLabel: statusLabel(run) } : null
+      canCancelRun: isRunActive(run),
+      checksStarted: ["checks-pending", "checks-resolved"].includes(run?.status),
+      checksComplete: run?.status === "checks-resolved",
+      noThreat: run?.status === "fate-resolved" && run.fateResult?.failed === false,
+      showEncounter: run?.fateResult?.failed === true && !["cancelled", "reset"].includes(run?.status),
+      showCurrentRun: isRunActive(run) || run?.status === "checks-resolved"
+        || (run?.status === "fate-resolved" && run.fateResult?.failed === false),
+      state: run && !["cancelled", "reset"].includes(run.status)
+        ? { ...run, rolls, statusLabel: statusLabel(run) } : null
     };
   }
 
@@ -1407,13 +1434,17 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
 
   async _onRender(context, options) {
     await super._onRender(context, options);
+    if (this.mode === "gm" && this.lastLayoutMode !== context.showCurrentRun) {
+      this.lastLayoutMode = context.showCurrentRun;
+      this.setPosition({ width: Math.min(context.showCurrentRun ? 960 : 480, window.innerWidth - 20) });
+    }
     if (this.element?.dataset.qbBound) return;
     this.element.dataset.qbBound = "true";
     this.element.addEventListener("click", (event) => {
       const button = event.target.closest("[data-app-action]");
       if (!button) return;
       event.preventDefault();
-      this._handleAppAction(button.dataset.appAction).catch(notifyError);
+      this._handleAppAction(button.dataset.appAction, button).catch(notifyError);
     });
     this.element.addEventListener("change", (event) => {
       const field = event.target;
@@ -1430,13 +1461,39 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     if (this.mode === "participant") updateActiveBonusPreview(this.element);
   }
 
-  async _handleAppAction(action) {
+  async _handleAppAction(action, button) {
     if (action === "submit-check") return this._submitParticipantCheck();
     if (!game.user.isGM) throw new Error("Only a GM can control the Quick Battles flow.");
     if (action === "start-fate") return enqueueSubmission(() => this._startFate());
     if (action === "choose-encounter") return enqueueSubmission(() => this._chooseEncounter());
     if (action === "start-checks") return enqueueSubmission(() => this._startChecks());
     if (action === "cancel-run") return enqueueSubmission(() => this._cancelRun());
+    if (action === "new-battle") return this._newBattle();
+    if (action === "apply-party-damage") return enqueueSubmission(() => applyPartyDamage(button.dataset.actorUuid));
+  }
+
+  async _newBattle() {
+    const current = await currentRun();
+    if (!current || !(current.run.status === "checks-resolved"
+      || (current.run.status === "fate-resolved" && current.run.fateResult?.failed === false))) {
+      throw new Error("Complete the current Quick Battle before starting a new one.");
+    }
+    if (Object.values(current.run.checks ?? {}).some((check) => check.status === "failed" && check.damage > 0 && !check.damageApplied)) {
+      const dialog = this.element.querySelector("[data-reset-confirm-dialog]");
+      const confirmed = new Promise((resolve) => {
+        dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm"), { once: true });
+      });
+      dialog.returnValue = "";
+      dialog.showModal();
+      if (!await confirmed) return;
+    }
+    return enqueueSubmission(async () => {
+      const latest = await currentRun(current.run.id);
+      if (!latest || latest.run.status !== current.run.status) throw new Error("The Quick Battle changed; try again.");
+      latest.run.status = "reset";
+      await persistRun(latest.run, latest.message);
+      await this.render();
+    });
   }
 
   async _startFate() {
@@ -1497,9 +1554,9 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       if (current) {
         current.run.fate.promptId = request.id;
         await persistRun(current.run, current.message);
-        if (current.run.status !== "fate-pending") {
+        if (current.run.fateResult) {
           await request.update({
-            content: chatCard(`<h3>Quick Battles · Fate check resolved</h3><p>${current.run.fateResult.label}: ${current.run.fateResult.total} vs DC ${current.run.fate.dc}.</p>`),
+            content: resolvedFateCard(current.run),
             [`flags.${MODULE_ID}.status`]: "resolved"
           });
         }
@@ -1813,16 +1870,21 @@ async function submitFateRoll(runId, requestId, userId) {
   const prompt = findMessageByFlag("fate-request", "requestId", requestId);
   const flag = prompt?.flags?.[MODULE_ID];
   if (!prompt || flag?.status !== "pending") throw new Error("This Fate roll is no longer pending.");
+  const current = await currentRun(runId);
+  if (!current || current.run.status !== "fate-pending" || current.run.fate.requestId !== requestId) {
+    throw new Error("This Fate roll is no longer pending.");
+  }
+  const modifiers = [current.run.fate.paceModifier, current.run.fate.situational, current.run.fate.campModifier];
   const lockKey = `fate:${requestId}`;
   if (inFlight.has(lockKey)) return;
   inFlight.add(lockKey);
   try {
-    const roll = await nativeD20(null, 0, "Quick Battles Fate d20");
+    const roll = await nativeD20(null, modifiers, "Quick Battles Fate d20");
     if (!roll) return;
     await roll.toMessage({
       flavor: "Quick Battles Fate d20",
       whisper: [...new Set([...gmUserIds(), game.user.id])],
-      flags: { [MODULE_ID]: { type: "fate-submission", runId, requestId, userId: game.user.id } }
+      flags: { [MODULE_ID]: { type: "fate-submission", runId, requestId, userId: game.user.id, includesFateModifiers: true } }
     });
   } finally {
     inFlight.delete(lockKey);
@@ -1936,7 +1998,8 @@ async function processFateSubmission(message, data) {
   if (current.run.fate.requestId !== data.requestId) return;
   if (!submitter?.isGM && current.run.fate.selectedUserId !== userId) return;
   if (current.run.status === "fate-pending") {
-    current.run.fate.d20 = submittedRoll(message);
+    const modifier = current.run.fate.paceModifier + current.run.fate.situational + current.run.fate.campModifier;
+    current.run.fate.d20 = submittedRoll(message) - (data.includesFateModifiers ? modifier : 0);
     current.run.fate.submissionId = message.id;
     current.run.status = "fate-resolving";
     await persistRun(current.run, current.message);
@@ -2022,14 +2085,14 @@ async function finishFate(run, message) {
     const prompt = game.messages.get(current.run.fate.promptId);
     if (prompt) {
       await prompt.update({
-        content: chatCard(`<h3>Quick Battles · Fate check resolved</h3><p>${current.run.fateResult.label}: ${total} vs DC ${current.run.fate.dc}.</p>`),
+        content: resolvedFateCard(current.run),
         [`flags.${MODULE_ID}.status`]: "resolved"
       });
     }
   }
   if (config.postGmResults) {
     await ChatMessage.create({
-      content: chatCard(`<h3>Fate result</h3><p>${current.run.fateResult.label}: ${total} vs DC ${current.run.fate.dc}.</p>${displayRollResult(current.run)}`),
+      content: chatCard(`<h3>Fate result</h3><p>${current.run.fateResult.label}: ${total} vs DC ${current.run.fate.dc}.</p>${displayRollResult(current.run)}`, failed ? "qb-fate-threat" : "qb-fate-safe"),
       whisper: gmUserIds()
     });
   }
@@ -2088,44 +2151,38 @@ async function processParticipantSubmission(message, data) {
   await persistRun(current.run, current.message);
   const prompt = game.messages.get(check.promptId);
   if (prompt) await prompt.delete();
-  if (!passed && damage.damage > 0) await createDamageControl(current.run, actor, message, details);
   mainApplication?.render();
 }
 
-async function createDamageControl(run, actor, resultMessage, details) {
-  const operationId = `${run.id}:${actor.uuid}:${details.checkId}`;
-  if (findMessageByFlag("damage-control", "operationId", operationId)) return;
-  const button = createButton("Apply damage once", "apply-damage", `data-operation-id="${escapeHtml(operationId)}"`);
-  await ChatMessage.create({
-    content: chatCard(`<h3>GM damage control · ${escapeHtml(actor.name)}</h3><p>Apply ${details.damage} damage (${details.damagePercent}% of max HP) for failure by ${details.margin}.</p>${button}`),
-    whisper: gmUserIds(),
-    flags: {
-      [MODULE_ID]: {
-        type: "damage-control",
-        operationId,
-        runId: run.id,
-        actorUuid: actor.uuid,
-        resultMessageId: resultMessage.id,
-        damage: details.damage,
-        status: "pending"
-      }
-    }
+async function applyPartyDamage(actorUuid) {
+  const current = await currentRun();
+  const check = current?.run.checks?.[actorUuid];
+  if (!check || check.status !== "failed" || check.damage <= 0 || check.damageApplied) {
+    throw new Error("No unapplied damage is available for this participant.");
+  }
+  const operationId = `${current.run.id}:${actorUuid}:${check.checkId}`;
+  return applyDamage(operationId, {
+    runId: current.run.id,
+    actorUuid,
+    resultMessageId: check.resultMessageId,
+    damage: check.damage
   });
 }
 
-async function applyDamage(operationId) {
+async function applyDamage(operationId, partyPayload = null) {
   if (!game.user.isGM) throw new Error("Only a GM can apply damage.");
   const activeGM = game.users.activeGM;
   if (activeGM && activeGM.id !== game.user.id) {
     throw new Error("Only the active GM can apply damage.");
   }
   const control = findMessageByFlag("damage-control", "operationId", operationId);
-  const payload = control?.flags?.[MODULE_ID];
+  const payload = control?.flags?.[MODULE_ID] ?? partyPayload;
   if (!payload) throw new Error("Damage control was not found.");
-  if (payload.status === "applied") {
-    await control.delete();
-    ui.notifications.info("This damage has already been applied.");
-    return;
+  const active = await currentRun(payload.runId);
+  const activeCheck = active?.run.checks?.[payload.actorUuid];
+  if (!active || !["checks-pending", "checks-resolved"].includes(active.run.status)
+    || !activeCheck || activeCheck.status !== "failed") {
+    throw new Error("This damage action is no longer available for the current Quick Battle.");
   }
   if (damageInFlight.has(operationId)) return;
   damageInFlight.add(operationId);
@@ -2133,7 +2190,7 @@ async function applyDamage(operationId) {
     const actor = await actorByUuid(payload.actorUuid);
     const appliedIds = actor.getFlag(MODULE_ID, "appliedDamageIds") ?? [];
     if (appliedIds.includes(operationId)) {
-      await control.update({ [`flags.${MODULE_ID}.status`]: "applied" });
+      if (control) await control.update({ [`flags.${MODULE_ID}.status`]: "applied" });
       const priorResult = game.messages.get(payload.resultMessageId);
       if (priorResult) {
         const details = priorResult.flags?.[MODULE_ID]?.details;
@@ -2150,8 +2207,12 @@ async function applyDamage(operationId) {
         check.damageApplied = true;
         await persistRun(current.run, current.message);
       }
-      await control.delete();
+      if (control) await control.delete();
+      mainApplication?.render();
       return;
+    }
+    if (payload.status === "applied") {
+      throw new Error("Damage control reports this damage as applied, but the actor's operation history is missing.");
     }
     const currentHp = Math.max(0, Number(actor.system?.attributes?.hp?.value) || 0);
     const damage = capDamageAtOneHp(payload.damage, currentHp);
@@ -2160,7 +2221,7 @@ async function applyDamage(operationId) {
       "system.attributes.hp.value": newHp,
       [`flags.${MODULE_ID}.appliedDamageIds`]: [...appliedIds, operationId]
     });
-    await control.update({ [`flags.${MODULE_ID}.status`]: "applied" });
+    if (control) await control.update({ [`flags.${MODULE_ID}.status`]: "applied" });
     const result = game.messages.get(payload.resultMessageId);
     if (result) {
       const details = result.flags?.[MODULE_ID]?.details;
@@ -2181,7 +2242,7 @@ async function applyDamage(operationId) {
       check.damageApplied = true;
       await persistRun(current.run, current.message);
     }
-    await control.delete();
+    if (control) await control.delete();
     ui.notifications.info(`${actor.name} takes ${damage} damage.`);
     mainApplication?.render();
   } finally {

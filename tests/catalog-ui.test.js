@@ -8,6 +8,7 @@ import { mergeCatalog } from "../scripts/logic.js";
 
 const source = await readFile(new URL("../scripts/quick-battles.js", import.meta.url), "utf8");
 const template = Handlebars.compile(await readFile(new URL("../templates/configuration.hbs", import.meta.url), "utf8"));
+const styles = await readFile(new URL("../styles/quick-battles.css", import.meta.url), "utf8");
 const formReader = source.slice(source.indexOf("function readConfigurationForm("), source.indexOf("\nasync function loadCatalog("));
 const application = source.slice(
   source.indexOf("class QuickBattlesConfigurationApplication"),
@@ -73,6 +74,27 @@ async function harness(overrides = []) {
   const field = (name) => query(`[data-catalog-dialog-field="${name}"]`);
   return { app, query, click, field, getSaved: () => saved };
 }
+
+test("feature catalog settings align beneath Results and damage with a compact persistent save action", async () => {
+  const ui = await harness();
+  const summary = ui.query(".qb-config-summary-grid");
+  assert.deepEqual(
+    Array.from(summary.children, (column) => column.classList.contains("qb-config-result-column")
+      ? Array.from(column.children, (section) => section.querySelector("h2").textContent)
+      : [column.querySelector("h2").textContent]),
+    [["Fate and travel"], ["Spell slot bonuses"], ["Results and damage", "Feature catalog changes"]]
+  );
+  const resultColumn = summary.children[2];
+  assert.ok(resultColumn.classList.contains("qb-config-result-column"));
+  assert.equal(resultColumn.children[1].classList.contains("qb-config-catalog"), true);
+  const save = ui.query('[data-app-action="save-config"]');
+  assert.equal(save.textContent, "Save Settings");
+  assert.match(styles, /\.qb-config-summary-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(styles, /\.qb-config-result-column\s*\{\s*display:\s*grid;[^}]*gap:\s*0\.85rem;/);
+  assert.match(styles, /\.qb-config-save\s*\{[^}]*position:\s*sticky;[^}]*bottom:\s*0\.65rem;[^}]*justify-self:\s*start;/);
+  assert.match(styles, /\.qb-config-shell\s*\{[^}]*overflow:\s*visible;[^}]*padding-bottom:\s*4\.25rem;/);
+  assert.match(styles, /@container quick-battles \(max-width: 40rem\)[\s\S]*?\.qb-config-summary-grid\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+});
 
 test("adding and editing catalog features survives rerenders and settings save", async () => {
   const ui = await harness([{ name: "Existing", type: "Passive", rating: "Medium", description: "kept" }]);

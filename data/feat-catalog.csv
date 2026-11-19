@@ -20,7 +20,7 @@ Arcane Recovery, Active, Medium, Regain expended spell slots equal to half Wizar
 Arcane Shot (Arcane Archer), Active, Medium, Apply special magic effect to arrow twice per short rest (Bursting; Grasping; Banishing; Shadow Arrow), Fighter
 Arcane Ward (Abjuration), Passive, High, Casting Abjuration spell creates magical shield absorbing damage equal to 2 x level + INT, Wizard
 Archdruid, Passive, High, Unlimited uses of Wild Shape; ignore verbal somatic and material components for Druid spells without cost, Druid
-Armor of Hexes (Hexblade), Passive, High, Reaction when hit by cursed target to roll d6; on 4+ attack misses regardless of attack roll, Warlock
+Armor of Hexes, Passive, Low, When hit by your Hexblade's Curse target, use your reaction to roll a d6; on a 4 or higher the attack misses, Warlock
 Armor of Shadows (Eldritch Invocation), Passive, Low, Cast Mage Armor on self at will without expending spell slot or components, Eldritch Invocation
 Artificer Initiate, Active, Low, Learn 1 Artificer cantrip and 1st-level spell; cast spell once per long rest using artisan tools, Feat
 Assassinate (Assassin), Passive, High, Advantage on attack rolls vs creatures that haven't taken a turn; automatic critical hit on surprised targets, Rogue
@@ -40,10 +40,12 @@ Blind Fighting (Fighting Style), Passive, Medium, Gain 10ft Blindsight range, Fi
 Blindsense, Passive, Low, Aware of location of hidden or invisible creatures within 10ft while able to hear, Rogue
 Blessed Warrior (Fighting Style), Passive, Low, Learn 2 Cleric cantrips using Charisma/Wisdom as spellcasting ability, Fighting Style
 Bountiful Luck, Passive, Medium, Reaction when ally within 30ft rolls a 1 on d20 to force reroll, Feat
-Brutal Critical, Passive, Low, Roll 1 (or up to 3) additional weapon damage dice on a critical hit, Barbarian
+Breath Weapon, Active, Medium, Exhale destructive energy; area damage and saving throw depend on ancestry and racial variant, Race
+Brutal Critical (1 die), Passive, Low, Roll one additional weapon damage die when you score a critical hit with a melee weapon attack, Barbarian
 Careful Spell (Metamagic), Passive, Low, Spend 1 point to allow chosen allies to automatically succeed saving throw vs your AoE spell, Sorcerer
 Chef, Active, Low, Treat treats during short rest (+1d8 healing); Bonus Action to eat treats in combat (Temp HP equal to proficiency bonus), Feat
 Charger, Passive, Low, Bonus Action melee attack or shove (+5 damage or 10ft push) after taking Dash action, Feat
+Channel Divinity, Active, Medium, Use a Channel Divinity option granted by your class or subclass, Class Feature
 Chronal Shift (Chronurgy), Active, High, Reaction to force reroll of an attack check or save within 30ft twice per long rest, Wizard
 Circle Forms (Moon), Passive, High, Transform into significantly higher CR beasts (CR 1 at level 2 scaling up to CR 6), Druid
 Circle of Mortality (Grave), Passive, Medium, Maximize healing dice when target is at 0 HP; gain Spare the Dying cantrip as Bonus Action, Cleric
@@ -76,7 +78,6 @@ Devil's Sight (Eldritch Invocation), Passive, High, See normally in dim light an
 Disciple of Life (Life), Passive, Medium, Spells of 1st level or higher heal extra 2 + spell's level HP, Cleric
 Distant Spell (Metamagic), Passive, Low, Spend 1 point to double spell range (or turn touch spell into 30ft range spell), Sorcerer
 Distant Strike (Horizon Walker), Passive, High, Teleport 10ft before each attack when using Attack action; gain 3rd attack if targeting 3 different targets, Ranger
-Divine Sense, Active, Low, Action to detect celestial fiend or undead within 60ft (uses equal to 1 + CHA mod per long rest), Paladin
 Divine Smite, Active, High, Expend spell slot on melee hit to deal extra 2d8 radiant damage + 1d8 per slot level above 1st (+1d8 vs undead/fiend), Paladin
 Divine Strike, Passive, Medium, Add 1d8 (increases to 2d8) elemental/weapon damage to weapon attack once per turn, Cleric
 Divine Intervention, Active, High, Action to roll d100; if roll <= Cleric level deity intervenes with any Cleric spell effect, Cleric
@@ -85,7 +86,7 @@ Dragon Fear, Active, Medium, Spend Dragonbreath charge to force 30ft Wisdom save
 Dragon Hide, Passive, Low, 13+DEX unarmored AC base; retractable claws (1d4+STR slashing), Feat
 Dragon Wings (Draconic), Active, Medium, Bonus Action to sprout dragon wings giving fly speed equal to walking speed, Sorcerer
 Drake Companion (Drake Warden), Active, Medium, Summon drake companion as Action; commands via Bonus Action to attack/infuse elemental damage, Ranger
-Dread Ambusher (Gloom Stalker), Passive, High, +WIS to initiative; on 1st turn of combat gain +10ft speed and extra attack dealing +1d8 damage, Ranger
+Dread Ambusher, Passive, Low, Add your Wisdom modifier to initiative; on your first turn your speed increases by 10 feet, and if you take the Attack action you can make one additional weapon attack that deals an extra 1d8 damage on a hit, Ranger
 Dread Aspect (Conquest), Active, High, Channel Divinity to force creatures within 30ft to save or become Frightened, Paladin
 Drow High Magic, Active, Medium, Cast Detect Magic at will; Levitate and Dispel Magic once per long rest without spell slots, Feat
 Druidic Warrior (Fighting Style), Passive, Low, Learn 2 Druid cantrips using Wisdom as spellcasting ability, Fighting Style
@@ -98,7 +99,12 @@ Dwarven Fortitude, Passive, Low, Spend 1 Hit Die to heal when taking the Dodge a
 Eldritch Adept, Passive, High, Gain 1 Eldritch Invocation option from Warlock class feature list, Feat
 Eldritch Cannon (Artillerist), Active, High, Bonus Action to activate mobile/tiny cannon (Flamethrower; Force Ballista 2d8+push; or Protector 1d8+INT Temp HP aura), Artificer
 Eldritch Master, Active, Low, Spend 1 minute to regain all expended Pact Magic spell slots once per long rest, Warlock
-Eldritch Mind (Eldritch Invocation), Passive, High, Advantage on CON saving throws made to maintain concentration on spells, Eldritch Invocation
+Eldritch Invocation: Eldritch Mind, Passive, Low, You have advantage on Constitution saving throws that you make to maintain concentration on a spell, Eldritch Invocation
+Eldritch Invocation: Improved Pact Weapon, Passive, Low, Your pact weapon can be a shortbow, longbow, light crossbow, or heavy crossbow; you gain a +1 bonus to its attack and damage rolls unless it is a magic weapon that already has a bonus, Eldritch Invocation
+Eldritch Invocation: Lifedrinker, Passive, Low, When you hit a creature with your pact weapon, the creature takes extra necrotic damage equal to your Charisma modifier, Eldritch Invocation
+Eldritch Invocation: Relentless Hex, Passive, Low, As a bonus action, teleport up to 30 feet to an unoccupied space you can see within 5 feet of a creature cursed by your Hex spell or Hexblade's Curse, Eldritch Invocation
+Eldritch Invocation: Sign of Ill Omen, Active, Low, Cast Bestow Curse once using a Warlock spell slot, Eldritch Invocation
+Eldritch Invocation: Thirsting Blade, Passive, Medium, When you take the Attack action on your turn, you can attack with your pact weapon twice instead of once, Eldritch Invocation
 Elemental Adept, Passive, Medium, Ignore element resistance on spells; treat 1s on damage dice as 2s, Feat
 Elemental Affinity (Draconic), Passive, Medium, Add CHA mod to elemental damage roll matching draconic ancestor; spend 1 point for resistance, Sorcerer
 Elegant Maneuver (Swashbuckler), Passive, Low, Bonus Action to gain advantage on next Acrobatics or Athletics check on same turn, Rogue
@@ -125,11 +131,13 @@ Fast Hands (Thief), Passive, Medium, Bonus Action to make DEX (Sleight of Hand) 
 Fast Movement, Passive, Low, +10ft movement speed while not wearing heavy armor, Barbarian
 Favored Enemy / Favored Foe, Passive, Low, Advantage on tracking/survival checks; TCoE Favored Foe adds concentration 1d4-1d8 damage on hit, Ranger
 Favored by the Gods (Divine Soul), Active, Medium, Add 2d4 to failed saving throw or missed attack roll once per short/long rest, Sorcerer
+Fell Handed, Passive, Low, Master the handaxe battleaxe greataxe warhammer and maul (+1 to attack rolls); advantage attacks can knock a target prone if both rolls hit; a missed attack with disadvantage can deal bludgeoning damage equal to your Strength modifier if the higher roll would hit; Help can grant an ally +2 to hit a shielded target, Feat
 Feral Instinct, Passive, Low, Advantage on initiative rolls; act normally on first turn if surprised by entering Rage, Barbarian
 Feral Senses, Passive, Medium, Attack unseen targets without disadvantage; aware of invisible targets within 30ft, Ranger
 Fey Presence (Archfey), Active, Low, Action to force 10ft cube to save vs WIS or become Charmed or Frightened until end of next turn, Warlock
 Fey Teleportation, Active, Medium, Cast Misty Step once per short/long rest without expending a spell slot, Feat
-Fey Touched, Active, High, Learn Misty Step and 1st-level Divination/Enchantment spell; cast each once per long rest without spell slots, Feat
+Fey Touched: Misty Step, Active, Low, Cast Misty Step once per long rest without expending a spell slot, Feat
+Fey Touched: Silvery Barbs, Active, Low, Cast Silvery Barbs once per long rest without expending a spell slot, Feat
 Fiendish Resilience (Fiend), Active, Medium, Choose one damage type to gain resistance to after every short or long rest, Warlock
 Fiendish Vigor (Eldritch Invocation), Passive, Low, Cast False Life on self at will as 1st-level spell without spell slot, Eldritch Invocation
 Fighting Initiate, Passive, Medium, Gain 1 Fighting Style option from Fighter class feature list, Feat
@@ -151,7 +159,8 @@ Giant Killer (Hunter), Passive, Low, Reaction to attack Large or larger creature
 Grappler, Passive, Low, Advantage against grappled target; Action to attempt pin (restrain target and self), Feat
 Grasp of Hadar (Eldritch Invocation), Passive, Low, Once per turn pull target hit by Eldritch Blast 10ft closer in straight line, Eldritch Invocation
 Grasp of the Deep (Fathomless), Active, Medium, Bonus Action to summon 10ft tentacle: deal 1d8/2d8 cold damage and reduce target speed by 10ft, Warlock
-Great Weapon Fighting (Fighting Style), Passive, Low, Reroll 1s and 2s on damage dice with two-handed/versatile melee weapons, Fighting Style
+Fighting Style: Archery, Passive, Low, You gain a +2 bonus to attack rolls you make with ranged weapons, Fighting Style
+Great Weapon Fighting, Passive, Low, When you roll a 1 or 2 on a damage die for an attack made with a melee weapon wielded with two hands, you can reroll the die and must use the new roll, Fighting Style
 Great Weapon Master, Passive, High, Bonus Action attack on critical/kill; Action option to take -5 to hit for +10 heavy weapon damage, Feat
 Grim Harvest (Necromancy), Passive, Low, Regain HP equal to 2x (or 3x) spell level when killing target with spell, Wizard
 Guided Strike (War), Active, Medium, Channel Divinity to gain +10 bonus to an attack roll after seeing the roll, Cleric
@@ -161,9 +170,8 @@ Healer, Active, Medium, Action with Healer's Kit to restore 1 HP to stabilized c
 Heavily Armored, Passive, Low, Heavy armor proficiency and +1 STR, Feat
 Heavy Armor Master, Passive, Medium, Reduce non-magical bludgeoning/piercing/slashing damage by 3 while wearing heavy armor, Feat
 Heightened Spell (Metamagic), Passive, High, Spend 3 points to impose disadvantage on target's first saving throw against spell, Sorcerer
-Hexblade's Curse (Hexblade), Active, High, Bonus Action curse target: +Proficiency damage crit on 19-20 regain HP equal to level+CHA when target dies, Warlock
+Hexblade's Curse, Active, Low, As a bonus action, curse one creature you can see within 30 feet; gain a bonus to damage rolls against it equal to your proficiency bonus, score critical hits against it on a 19 or 20, and regain hit points equal to your warlock level plus Charisma modifier if it dies, Warlock
 Hex Warrior (Hexblade), Passive, High, Medium armor/shield proficiency; use CHA modifier for weapon attack and damage rolls, Warlock
-Hide in Plain Sight, Passive, Low, Spend 10 minutes camouflaging to gain +10 to Stealth checks while remaining motionless, Ranger
 Holy Nimbus / Avenging Angel / Elder Champion, Active, High, Cap-stone 20th-level transformation granting extreme combat buffs for 1 minute per long rest, Paladin
 Horde Breaker (Hunter), Passive, High, Once per turn make an extra weapon attack against a second target within 5ft of first target, Ranger
 Hound of Ill Omen (Shadow), Active, High, Spend 3 Sorcery Points as Bonus Action to summon dire wolf hound that imposes save disadvantage on target, Sorcerer
@@ -183,12 +191,13 @@ Instinctive Charm (Enchantment), Passive, Medium, Reaction when attacked to dive
 Interception (Fighting Style), Passive, Medium, Reaction to reduce attack damage on adjacent ally by 1d10 + proficiency bonus, Fighting Style
 Inured to Undeath (Necromancy), Passive, Low, Resistance to necrotic damage; max HP cannot be reduced, Wizard
 Invoke Duplicity (Trickery), Active, Medium, Channel Divinity to create illusionary duplicate for spell origin and attack advantage, Cleric
-Iron Mind (Gloom Stalker), Passive, Medium, Gain proficiency in Wisdom saving throws, Ranger
+Iron Mind, Passive, Low, You gain proficiency in Wisdom saving throws, Ranger
 Ki / Dedicated Weapon, Active, High, Expend Ki points to fuel Flurry of Blows Patient Defense Step of the Wind or stunning strikes, Monk
 Ki-Empowered Strikes, Passive, Medium, Unarmed strikes count as magical for overcoming resistances, Monk
 Know Your Enemy (Battle Master), Passive, Low, Observe target for 1 minute to learn combat capabilities relative to yourself, Fighter
 Lance of Lethargy (Eldritch Invocation), Passive, Low, Once per turn reduce speed of target hit by Eldritch Blast by 10ft until end of next turn, Eldritch Invocation
 Land's Stride, Passive, Low, Pass through nonmagical difficult terrain without penalty; advantage on saves vs magical plant movement restraint, Druid
+Lucky, Active, Medium, Spend a luck point to roll an additional d20 for an attack roll, ability check, or saving throw, or when an attack roll is made against you; choose which d20 is used, Feat
 Lay on Hands, Active, Medium, Action to heal target from HP pool (5 x Paladin level) or cure disease/poison for 5 HP per effect, Paladin
 Mage Hand Legerdemain (Arcane Trickster), Passive, Low, Control invisible Mage Hand as Bonus Action to stow retrieve pick locks or disarm traps, Rogue
 Mage Slayer, Passive, Medium, Reaction attack vs caster within 5ft; target has disadvantage on concentration checks; advantage on saves vs 5ft spells, Feat
@@ -216,13 +225,14 @@ Multiattack: Volley / Whirlwind (Hunter), Active, High, Action to make ranged at
 Mystic Arcanum, Active, High, Cast one 6th 7th 8th and 9th level spell once per long rest without spell slots, Warlock
 Natural Explorer / Deft Explorer, Passive, Low, Ignore difficult terrain navigation bonuses; TCoE grants speed increase Temp HP and exhaustion reduction, Ranger
 Natural Recovery (Land), Active, Medium, Regain expended spell slots equal to half Druid level during a short rest, Druid
+Nature's Veil, Active, Medium, As a bonus action become magically invisible until the start of your next turn, Ranger
 Nature's Wrath (Ancients), Active, Low, Channel Divinity to restrain target within 10ft (STR/DEX save), Paladin
 Observant, Passive, Low, +5 to Passive Perception and Passive Investigation, Feat
 Open Hand Technique (Open Hand), Passive, High, Flurry of Blows hits impose knock prone (DEX save) 15ft push (STR save) or remove reactions, Monk
 Orcish Fury, Active, Medium, Add 1 extra weapon damage die once per short/long rest; Reaction attack when using Relentless Endurance, Feat
 Overchannel (Evocation), Active, High, Maximize damage of 1st-5th level Evocation spell (subsequent uses take escalating necrotic damage), Wizard
 Pact Magic, Active, High, Regain all expended spell slots on a short rest; cast spells at fixed highest available level, Warlock
-Pact of the Blade, Passive, Medium, Action to create magical pact weapon or transform magic weapon; weapon attacks count as magical, Warlock
+Pact Boon: Pact of the Blade, Passive, Low, You can use an action to create a pact weapon or transform a magic weapon into your pact weapon; it counts as magical for overcoming resistance and immunity to nonmagical attacks and damage, Warlock
 Pact of the Chain, Active, Medium, Cast Find Familiar to summon special familiar (Imp Pseudodrow Quasit Sprite) that can attack, Warlock
 Pact of the Talisman (TCoE), Passive, Low, Wearer adds 1d4 to failed ability checks (and saves with invocation), Warlock
 Pact of the Tome, Passive, Medium, Gain Book of Shadows with 3 cantrips from any spell list, Warlock
@@ -233,7 +243,7 @@ Persistent Rage, Passive, Low, Rage ends early only if knocked unconscious or ch
 Piercer, Passive, Medium, Once per turn reroll 1 piercing damage die; add extra damage die on piercing critical hit, Feat
 Planar Warrior (Horizon Walker), Passive, Medium, Bonus Action to convert attack damage to force damage and add extra 1d8-2d8 force damage, Ranger
 Poisoner, Active, Medium, Ignore poison resistance; Bonus Action to apply poison to weapon (2d8 poison damage + Poisoned condition), Feat
-Polearm Master, Passive, High, Bonus Action opposite-end attack (1d4); Reaction opportunity attack when target enters reach, Feat
+Polearm Master, Passive, Medium, Bonus Action opposite-end attack (1d4); Reaction opportunity attack when target enters reach, Feat
 Portent (Divination), Active, High, Roll 2 (or 3) d20s after long rest; replace any attack save or check roll during the day with stored d20, Wizard
 Potent Cantrip (Evocation), Passive, Low, Targets take half damage from your saving throw cantrips on a successful save, Wizard
 Potent Spellcasting, Passive, Medium, Add WIS modifier to damage dealt with any Cleric cantrip, Cleric
@@ -257,7 +267,7 @@ Rakish Audacity (Swashbuckler), Passive, High, Add CHA modifier to initiative; t
 Rapid Strike (Samurai), Passive, High, Forgo advantage on one attack to make one additional weapon attack as part of Attack action, Fighter
 Reckless Attack, Passive, Medium, First attack on turn gains advantage; enemy attacks against you gain advantage until next turn, Barbarian
 Relentless (Battle Master), Passive, Low, Regain 1 Superiority Die when initiating combat with 0 remaining, Fighter
-Relentless Avenger (Vengeance), Passive, Low, Move up to half speed as part of opportunity attack without provoking opportunity attacks, Paladin
+Relentless Avenger, Passive, Low, When you hit a creature with an opportunity attack move up to half your speed as part of the reaction without provoking opportunity attacks, Paladin
 Relentless Rage, Active, High, DC 10 CON save (increases by 5 per check) to drop to 1 HP instead of 0 HP while raging, Barbarian
 Reliable Talent, Passive, Medium, Treat d20 roll of 9 or lower as a 10 for any skill check using proficiency, Rogue
 Remarkable Athlete (Champion), Passive, Low, Add half proficiency bonus to physical checks; jump distance increased, Fighter
@@ -335,6 +345,7 @@ Tides of Chaos (Wild Magic), Active, Medium, Gain advantage on one attack check 
 Timeless Body, Passive, Low, Age 1 year for every 10 years passed; immune to magical aging, Druid
 Tokens of the Departed (Phantom), Passive, Medium, Reaction when creature dies within 30ft to capture Soul Token: grants save advantage and target query, Rogue
 Tool Expertise, Passive, Low, Double proficiency bonus for any check made using artisan's tools, Artificer
+Totem Spirit: Crocodile, Passive, High, While raging, you have resistance to all damage except psychic damage, Barbarian
 Touch of Death (Long Death), Passive, Medium, Regain Temp HP equal to WIS mod + Monk level when reducing target within 5ft to 0 HP, Monk
 Tough, Passive, Medium, Increase max HP by 2x character level (+2 HP per level retroactively), Feat
 Transmuted Spell (Metamagic), Passive, Medium, Spend 1 point to change elemental damage type (acid cold fire lightning poison thunder), Sorcerer
