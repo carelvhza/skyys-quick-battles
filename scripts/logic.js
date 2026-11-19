@@ -351,31 +351,35 @@ function getPathValue(object, path) {
 }
 
 export async function applyResourceUpdates(actor, itemUpdates = [], actorUpdates = {}) {
+  const expectedActorUpdates = Object.entries(actorUpdates);
+  let updatedActor = actor;
+
+  if (expectedActorUpdates.length) {
+    if (typeof actor?.update !== "function") {
+      throw new Error("This actor cannot update spell-slot resources.");
+    }
+    updatedActor = (await actor.update({ ...actorUpdates })) ?? actor;
+  }
+
   for (const update of itemUpdates) {
     const { _id, ...changes } = update;
-    const item = actor.items?.get(_id);
+    const item = updatedActor.items?.get(_id);
     if (typeof item?.update !== "function") {
       throw new Error(`This actor cannot update resource item ${_id}.`);
     }
     await item.update(changes);
   }
-  if (Object.keys(actorUpdates).length) {
-    if (typeof actor?.update !== "function") {
-      throw new Error("This actor cannot update spell-slot resources.");
-    }
-    await actor.update(actorUpdates);
-  }
 
   for (const update of itemUpdates) {
-    const item = actor.items?.get(update._id);
+    const item = updatedActor.items?.get(update._id);
     if (!item) throw new Error(`Could not verify resource updates for item ${update._id}.`);
     const changes = Object.entries(update).filter(([path]) => path !== "_id");
     if (changes.some(([path, expected]) => Number(getPathValue(item, path)) !== Number(expected))) {
       throw new Error(`The resource update for ${item.name} was not saved.`);
     }
   }
-  for (const [path, expected] of Object.entries(actorUpdates)) {
-    if (Number(getPathValue(actor, path)) !== Number(expected)) {
+  for (const [path, expected] of expectedActorUpdates) {
+    if (Number(getPathValue(updatedActor, path)) !== Number(expected)) {
       throw new Error(`The actor resource update at ${path} was not saved.`);
     }
   }
