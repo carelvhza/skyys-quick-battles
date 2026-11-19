@@ -104,7 +104,7 @@ Eldritch Invocation: Improved Pact Weapon, Passive, Low, Your pact weapon can be
 Eldritch Invocation: Lifedrinker, Passive, Low, When you hit a creature with your pact weapon, the creature takes extra necrotic damage equal to your Charisma modifier, Eldritch Invocation
 Eldritch Invocation: Relentless Hex, Passive, Low, As a bonus action, teleport up to 30 feet to an unoccupied space you can see within 5 feet of a creature cursed by your Hex spell or Hexblade's Curse, Eldritch Invocation
 Eldritch Invocation: Sign of Ill Omen, Active, Low, Cast Bestow Curse once using a Warlock spell slot, Eldritch Invocation
-Eldritch Invocation: Thirsting Blade, Passive, Medium, When you take the Attack action on your turn, you can attack with your pact weapon twice instead of once, Eldritch Invocation
+Eldritch Invocation: Thirsting Blade, Passive, Low, When you take the Attack action on your turn, you can attack with your pact weapon twice instead of once, Eldritch Invocation
 Elemental Adept, Passive, Medium, Ignore element resistance on spells; treat 1s on damage dice as 2s, Feat
 Elemental Affinity (Draconic), Passive, Medium, Add CHA mod to elemental damage roll matching draconic ancestor; spend 1 point for resistance, Sorcerer
 Elegant Maneuver (Swashbuckler), Passive, Low, Bonus Action to gain advantage on next Acrobatics or Athletics check on same turn, Rogue
@@ -122,7 +122,7 @@ Expert Divination (Divination), Passive, Medium, Casting 2nd+ level Divination s
 Extended Spell (Metamagic), Passive, Low, Spend 1 point to double spell duration (up to 24 hours), Sorcerer
 Extra Attack (2), Passive, Medium, Attack 3 times with the Attack action on your turn, Fighter
 Extra Attack (3), Passive, Medium, Attack 4 times with the Attack action on your turn, Fighter
-Extra Attack, Passive, Medium, Attack twice instead of once when taking Attack action on your turn, Fighter
+Extra Attack, Passive, Low, Attack twice instead of once when taking Attack action on your turn, Fighter
 Eyes of the Dark (Shadow), Active, Medium, 120ft Darkvision; spend 2 Sorcery Points to cast Darkness that you can see through, Sorcerer
 Eyes of the Grave (Grave), Passive, Low, Action to sense location of undead within 60ft at will, Cleric
 Fade Away, Active, Medium, Reaction when taking damage to turn invisible until end of next turn (1/short or long rest), Feat
@@ -161,7 +161,7 @@ Grasp of Hadar (Eldritch Invocation), Passive, Low, Once per turn pull target hi
 Grasp of the Deep (Fathomless), Active, Medium, Bonus Action to summon 10ft tentacle: deal 1d8/2d8 cold damage and reduce target speed by 10ft, Warlock
 Fighting Style: Archery, Passive, Low, You gain a +2 bonus to attack rolls you make with ranged weapons, Fighting Style
 Great Weapon Fighting, Passive, Low, When you roll a 1 or 2 on a damage die for an attack made with a melee weapon wielded with two hands, you can reroll the die and must use the new roll, Fighting Style
-Great Weapon Master, Passive, High, Bonus Action attack on critical/kill; Action option to take -5 to hit for +10 heavy weapon damage, Feat
+Great Weapon Master, Passive, Medium, Bonus Action attack on critical/kill; Action option to take -5 to hit for +10 heavy weapon damage, Feat
 Grim Harvest (Necromancy), Passive, Low, Regain HP equal to 2x (or 3x) spell level when killing target with spell, Wizard
 Guided Strike (War), Active, Medium, Channel Divinity to gain +10 bonus to an attack roll after seeing the roll, Cleric
 Gunner, Passive, High, Firearm proficiency; ignore loading property; no disadvantage on ranged attacks within 5ft, Feat
@@ -243,7 +243,7 @@ Persistent Rage, Passive, Low, Rage ends early only if knocked unconscious or ch
 Piercer, Passive, Medium, Once per turn reroll 1 piercing damage die; add extra damage die on piercing critical hit, Feat
 Planar Warrior (Horizon Walker), Passive, Medium, Bonus Action to convert attack damage to force damage and add extra 1d8-2d8 force damage, Ranger
 Poisoner, Active, Medium, Ignore poison resistance; Bonus Action to apply poison to weapon (2d8 poison damage + Poisoned condition), Feat
-Polearm Master, Passive, Medium, Bonus Action opposite-end attack (1d4); Reaction opportunity attack when target enters reach, Feat
+Polearm Master, Passive, Low, Bonus Action opposite-end attack (1d4); Reaction opportunity attack when target enters reach, Feat
 Portent (Divination), Active, High, Roll 2 (or 3) d20s after long rest; replace any attack save or check roll during the day with stored d20, Wizard
 Potent Cantrip (Evocation), Passive, Low, Targets take half damage from your saving throw cantrips on a successful save, Wizard
 Potent Spellcasting, Passive, Medium, Add WIS modifier to damage dealt with any Cleric cantrip, Cleric
@@ -290,7 +290,7 @@ Shadow Arts (Shadow), Active, Medium, Spend 2 Ki to cast Darkness Darkvision Pas
 Shadow Step (Shadow), Passive, High, Bonus Action to teleport up to 60ft from dim light/darkness to dim light/darkness with attack advantage, Monk
 Shadow Touched, Active, Medium, Learn Invisibility and 1st-level Illusion/Necromancy spell; cast each once per long rest without spell slots, Feat
 Shadowy Dodge (Gloom Stalker), Passive, Medium, Reaction when attacked without advantage to impose disadvantage on attack roll, Ranger
-Sharpshooter, Passive, High, Ignore half/three-quarters cover; no long range disadvantage; Action option to take -5 to hit for +10 damage, Feat
+Sharpshooter, Passive, Medium, Ignore half/three-quarters cover; no long range disadvantage; Action option to take -5 to hit for +10 damage, Feat
 Shield Master, Passive, Medium, Bonus Action shove following Attack action; add shield AC to DEX saves; Reaction for no damage on save, Feat
 Signature Spells, Passive, Medium, Choose two 3rd-level Wizard spells to always have prepared and cast each once per short/long rest for free, Wizard
 Silver Tongues (Eloquence), Passive, Low, Minimum 10 on d20 for Persuasion/Deception checks, Bard

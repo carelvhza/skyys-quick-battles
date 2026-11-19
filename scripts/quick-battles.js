@@ -36,14 +36,15 @@ const DEFAULT_CONFIG = {
   paceModifiers: { fast: -2, normal: 0, slow: 2 },
   spellSlotBonuses: { 1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 3, 7: 3, 8: 3, 9: 4 },
   encounterDifficultyBands: [
-    { min: 1, max: 7, label: "Easy", dc: 19 },
-    { min: 8, max: 16, label: "Medium", dc: 23 },
-    { min: 17, max: 18, label: "Hard", dc: 29 },
-    { min: 19, max: 19, label: "Deadly", dc: 34 },
-    { min: 20, max: 20, label: "Combat", dc: 0, combat: true }
+    { min: 1, max: 7, label: "Easy", dc: 19, damage: 4 },
+    { min: 8, max: 16, label: "Medium", dc: 23, damage: 6 },
+    { min: 17, max: 18, label: "Hard", dc: 28, damage: 8 },
+    { min: 19, max: 19, label: "Deadly", dc: 34, damage: 10 },
+    { min: 20, max: 20, label: "Combat!", dc: 0, damage: 0, combat: true }
   ],
   maxActiveUses: 5,
   damageCap: 1,
+  keepOneHp: true,
   postGmResults: true
 };
 
@@ -93,6 +94,21 @@ function numberValue(value, label) {
   return parsed;
 }
 
+function bandWithDamage(band) {
+  if (band.damage != null) return { ...band };
+  const match = DEFAULT_CONFIG.encounterDifficultyBands.find((entry) => (
+    Number(entry.min) === Number(band.min) && Number(entry.max) === Number(band.max)
+    && entry.label === band.label && Number(entry.dc) === Number(band.dc)
+    && Boolean(entry.combat) === Boolean(band.combat)
+  ));
+  return { ...band, damage: match?.damage ?? Math.max(0, Math.round(Number(band.dc) / 5)) };
+}
+
+function passiveWithoutHp(passive) {
+  const { hp, ...rest } = passive;
+  return { ...rest, total: Number(passive.total) - (Number(hp) || 0) };
+}
+
 async function nativeD20(actor, modifier, flavor) {
   const rollClass = CONFIG.Dice.D20Roll;
   if (!rollClass?.build) throw new Error("D&D 5e's native D20 roll workflow is unavailable.");
@@ -130,6 +146,7 @@ function normalizeConfig(candidate) {
   for (const key of ["players", "encounterGroups", "encounters", "catalogOverrides", "encounterDifficultyBands"]) {
     if (!Array.isArray(config[key])) throw new Error(`${key} must be an array.`);
   }
+  config.encounterDifficultyBands = config.encounterDifficultyBands.map(bandWithDamage);
   if (config.encounterGroups.length === 0) config.encounterGroups = clone(DEFAULT_CONFIG.encounterGroups);
   if (config.players.some((player) => !player?.userId || !player?.actorUuid)) {
     throw new Error("Each player entry needs a userId and actorUuid.");
@@ -170,8 +187,9 @@ function normalizeConfig(candidate) {
     throw new Error("Each roster entry needs an actor id, UUID, or name and a positive whole-number count.");
   }
   if (config.encounterDifficultyBands.some((band) => !Number.isFinite(Number(band.min))
-    || !Number.isFinite(Number(band.max)) || !Number.isFinite(Number(band.dc)))) {
-    throw new Error("Each encounter difficulty band needs numeric min, max, and dc values.");
+    || !Number.isFinite(Number(band.max)) || !Number.isFinite(Number(band.dc))
+    || !Number.isInteger(Number(band.damage)) || Number(band.damage) < 0)) {
+    throw new Error("Each encounter difficulty band needs numeric min, max, and dc values and non-negative whole-number damage.");
   }
   const bands = [...config.encounterDifficultyBands].sort((left, right) => Number(left.min) - Number(right.min));
   let nextRoll = 1;
@@ -184,6 +202,7 @@ function normalizeConfig(candidate) {
   }
   if (nextRoll !== 21) throw new Error("Encounter difficulty bands must cover d20 results 1 through 20.");
   config.damageCap = Math.min(1, Math.max(0, numberValue(config.damageCap, "damageCap")));
+  if (typeof config.keepOneHp !== "boolean") throw new Error("The keep-one-HP setting must be enabled or disabled.");
   const maxActiveUses = Number(config.maxActiveUses);
   if (!Number.isInteger(maxActiveUses) || maxActiveUses < 0) {
     throw new Error("Maximum number of active feats or spells must be a non-negative whole number.");
@@ -235,13 +254,19 @@ function readConfigurationForm(element, baseConfig = DEFAULT_CONFIG) {
       groups: Array.from(row.querySelectorAll('[data-field="groups"]:checked')).map((input) => input.value)
     };
   });
-  config.encounterDifficultyBands = rows("encounterDifficultyBands").map((row) => ({
-    min: number(row, "min"),
-    max: number(row, "max"),
-    label: text(row, "label"),
-    dc: number(row, "dc"),
-    ...(field(row, "combat")?.checked ? { combat: true } : {})
-  }));
+  config.encounterDifficultyBands = rows("encounterDifficultyBands").map((row) => {
+    const band = {
+      ...(baseConfig.encounterDifficultyBands[Number(row.dataset.configIndex)] ?? {}),
+      min: number(row, "min"),
+      max: number(row, "max"),
+      label: text(row, "label"),
+      dc: number(row, "dc"),
+      damage: number(row, "damage")
+    };
+    if (field(row, "combat")?.checked) band.combat = true;
+    else delete band.combat;
+    return band;
+  });
   config.catalogOverrides = rows("catalogOverrides").map((row) => {
     const index = Number(row.dataset.configIndex);
     const override = { ...(baseConfig.catalogOverrides[index] ?? {}) };
@@ -276,7 +301,8 @@ function readConfigurationForm(element, baseConfig = DEFAULT_CONFIG) {
       return [level, number(element, `spellSlot${level}`)];
     })
   );
-  config.damageCap = number(element, "damageCap");
+  config.damageCap = number(element, "damageCap") / 100;
+  config.keepOneHp = field(element, "keepOneHp")?.checked ?? false;
   config.maxActiveUses = number(element, "maxActiveUses");
   config.postGmResults = field(element, "postGmResults")?.checked ?? false;
   return config;
@@ -447,7 +473,6 @@ function participantPreview(actor, catalog, config) {
   const catalogBonuses = selectedCatalogBonuses(catalog, items);
   const passive = calculatePassiveBonuses({
     abilities: actorAbilities(actor),
-    currentHp: actor.system?.attributes?.hp?.value,
     ac: actor.system?.attributes?.ac?.value,
     catalogBonus: catalogBonuses.passiveBonus
   });
@@ -731,6 +756,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     };
     const preparedConfig = {
       ...config,
+      damageCapPercent: config.damageCap * 100,
       players: config.players.map((player) => {
         const user = game.users.get(player.userId);
         const ownedCharacters = user ? playerActorOptions(user).map((actor) => ({
@@ -1270,7 +1296,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         roster: []
       });
     } else if (action === "add-band") {
-      this.configDraft.encounterDifficultyBands.push({ min: 1, max: 0, label: "", dc: 0 });
+      this.configDraft.encounterDifficultyBands.push({ min: 1, max: 0, label: "", dc: 0, damage: 0 });
     } else if (action === "add-override") {
       this.configDraft.catalogOverrides.push({ name: "", type: "Active", rating: "Low" });
       const index = this.configDraft.catalogOverrides.length - 1;
@@ -1426,7 +1452,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       isParticipant: true,
       checkId: payload.checkId,
       actor: expected.actor,
-      passive: expected.passive,
+      passive: passiveWithoutHp(expected.passive),
       passiveEntries: expected.passiveEntries,
       activeItems,
       spellSlots,
@@ -1627,6 +1653,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       name: selected.name,
       description: selected.description ?? "",
       dc: Number(selected.dc ?? fateDifficulty.dc),
+      damage: bandWithDamage(fateDifficulty).damage,
       difficultyLabel: selected.difficultyLabel ?? fateDifficulty.label,
       roster
     };
@@ -1666,6 +1693,9 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       throw new Error("Only configured players' main characters can participate.");
     }
     const catalog = await effectiveCatalog(config);
+    current.run.selectedEncounter.damage ??= bandWithDamage(current.run.fateResult.difficulty).damage;
+    current.run.selectedEncounter.damageCap ??= config.damageCap;
+    current.run.selectedEncounter.keepOneHp ??= config.keepOneHp;
     current.run.participantIds = selectedUuids;
     current.run.status = "checks-pending";
     current.run.checks = {};
@@ -1741,13 +1771,20 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       }
       const config = normalizeConfig({ ...DEFAULT_CONFIG, ...payload.config });
       const preview = payload.preview;
+      const passive = passiveWithoutHp(preview.passive);
+      const run = await currentRun(payload.runId);
+      if (!run || run.run.status !== "checks-pending") throw new Error("This Quick Battle is no longer accepting checks.");
+      const liveConfig = await readConfig();
+      const band = run.run.fateResult?.difficulty;
+      if (!band) throw new Error("The Quick Battle has no difficulty band for damage.");
+      const damageRate = run.run.selectedEncounter.damage ?? bandWithDamage(band).damage;
       const activePlan = this._activeSpendPlan(actor, preview.activeItems);
       const slotPlan = this._slotSpendPlan(actor, preview.spellSlots, config.spellSlotBonuses);
       validateActiveUseLimit(activePlan.count + activeUseCount(
         Object.values(slotPlan.spends).map((count) => ({ count }))
       ), config.maxActiveUses);
       const situational = numberValue(this.element.querySelector('[name="situational"]').value, "Situational modifier");
-      const totalModifier = preview.passive.total + activePlan.bonus + slotPlan.bonus + situational;
+      const totalModifier = passive.total + activePlan.bonus + slotPlan.bonus + situational;
       const roll = await nativeD20(actor, totalModifier, `Quick Battle check · ${actor.name}`);
       if (!roll) return;
       await applyResourceUpdates(actor, activePlan.updates, slotPlan.updates);
@@ -1759,8 +1796,10 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
           actor.system?.attributes?.hp?.max,
           total,
           payload.dc,
-          config.damageCap,
-          actor.system?.attributes?.hp?.value
+          damageRate,
+          run.run.selectedEncounter.damageCap ?? liveConfig.damageCap,
+          actor.system?.attributes?.hp?.value,
+          run.run.selectedEncounter.keepOneHp ?? liveConfig.keepOneHp
         );
       const details = {
         actorName: actor.name,
@@ -1773,7 +1812,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
         margin: damage.margin,
         damage: damage.damage,
         damagePercent: Math.round(damage.fraction * 100),
-        passive: preview.passive,
+        passive,
         passiveEntries: preview.passiveEntries,
         activeEntries: [
           ...activePlan.entries,
@@ -1867,7 +1906,6 @@ function renderParticipantResult(details, damageApplied) {
   const signed = (value) => `${Number(value) >= 0 ? "+" : ""}${Number(value) || 0}`;
   const passiveBreakdown = [
     { name: details.passive.abilityName, bonus: details.passive.ability },
-    { name: "HP", bonus: details.passive.hp },
     { name: "AC", bonus: details.passive.armor },
     ...details.passiveEntries
   ];
@@ -2151,6 +2189,10 @@ async function processParticipantSubmission(message, data) {
   if (!current || current.run.status !== "checks-pending") return;
   const check = current.run.checks[data.actorUuid];
   if (!check || check.checkId !== data.checkId) return;
+  const config = await readConfig();
+  current.run.selectedEncounter.damage ??= bandWithDamage(current.run.fateResult.difficulty).damage;
+  current.run.selectedEncounter.damageCap ??= config.damageCap;
+  current.run.selectedEncounter.keepOneHp ??= config.keepOneHp;
   if (check.status === "pending") {
     check.status = "processing";
     check.submissionId = message.id;
@@ -2160,15 +2202,16 @@ async function processParticipantSubmission(message, data) {
   const details = data.details;
   details.dice ??= participantDice(message.rolls?.[0]);
   const passed = total >= Number(current.run.selectedEncounter.dc);
-  const config = await readConfig();
   const damage = passed
     ? { margin: 0, fraction: 0, damage: 0 }
     : failureDamage(
       actor.system?.attributes?.hp?.max,
       total,
       current.run.selectedEncounter.dc,
-      config.damageCap,
-      actor.system?.attributes?.hp?.value
+      current.run.selectedEncounter.damage,
+      current.run.selectedEncounter.damageCap,
+      actor.system?.attributes?.hp?.value,
+      current.run.selectedEncounter.keepOneHp
     );
   details.total = total;
   details.passed = passed;
@@ -2257,7 +2300,8 @@ async function applyDamage(operationId, partyPayload = null) {
       throw new Error("Damage control reports this damage as applied, but the actor's operation history is missing.");
     }
     const currentHp = Math.max(0, Number(actor.system?.attributes?.hp?.value) || 0);
-    const damage = capDamageAtOneHp(payload.damage, currentHp);
+    const config = await readConfig();
+    const damage = capDamageAtOneHp(payload.damage, currentHp, active.run.selectedEncounter?.keepOneHp ?? config.keepOneHp);
     const newHp = currentHp - damage;
     await actor.update({
       "system.attributes.hp.value": newHp,

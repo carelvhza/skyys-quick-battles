@@ -16,11 +16,11 @@ const application = source.slice(
 );
 const defaults = {
   players: [], encounterGroups: [{ id: "main", name: "Main" }], encounters: [],
-  catalogOverrides: [], encounterDifficultyBands: [{ min: 1, max: 20, label: "Normal", dc: 10 }],
+  catalogOverrides: [],   encounterDifficultyBands: [{ min: 1, max: 20, label: "Normal", dc: 10, damage: 2 }],
   fateDcs: { easy: 10, medium: 13, hard: 16 }, campBonus: 3,
   paceModifiers: { fast: -2, normal: 0, slow: 2 },
   spellSlotBonuses: Object.fromEntries(Array.from({ length: 9 }, (_, i) => [i + 1, 1])),
-  damageCap: 1, maxActiveUses: 5, postGmResults: true
+  damageCap: 1, keepOneHp: true, maxActiveUses: 5, postGmResults: true
 };
 const copy = (value) => JSON.parse(JSON.stringify(value));
 
@@ -98,6 +98,22 @@ test("feature catalog settings align beneath Results and damage with a compact p
   assert.match(styles, /@container quick-battles \(max-width: 40rem\)[\s\S]*?\.qb-config-summary-grid\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
 });
 
+test("damage settings render percentages and retain band metadata on save", async () => {
+  const ui = await harness();
+  ui.app.configDraft.encounterDifficultyBands[0].customMetadata = "kept";
+  await ui.app.render();
+  assert.equal(ui.query('[data-field="damageCap"]').value, "100");
+  assert.equal(ui.query('[data-config-collection="encounterDifficultyBands"] [data-field="damage"]').value, "2");
+  ui.query('[data-field="damageCap"]').value = "35";
+  ui.query('[data-field="keepOneHp"]').checked = false;
+  ui.query('[data-config-collection="encounterDifficultyBands"] [data-field="damage"]').value = "7";
+  await ui.click('[data-app-action="save-config"]');
+  assert.equal(ui.getSaved().damageCap, 0.35);
+  assert.equal(ui.getSaved().keepOneHp, false);
+  assert.equal(ui.getSaved().encounterDifficultyBands[0].damage, 7);
+  assert.equal(ui.getSaved().encounterDifficultyBands[0].customMetadata, "kept");
+});
+
 test("adding and editing catalog features survives rerenders and settings save", async () => {
   const ui = await harness([{ name: "Existing", type: "Passive", rating: "Medium", description: "kept" }]);
   await ui.click('[data-app-action="open-catalog-manager"]');
@@ -140,8 +156,8 @@ test("removing one catalog override preserves the remaining indexed data", async
     { name: "Second", type: "Passive", rating: "High", description: "second", bonus: 7, customMetadata: "preserved" }
   ]);
   await ui.click('[data-app-action="open-catalog-manager"]');
-  await ui.click('[data-config-index="0"] [data-app-action="remove-row"]');
-  await ui.click('[data-config-index="0"] [data-app-action="edit-catalog-override"]');
+  await ui.click('[data-config-collection="catalogOverrides"] [data-config-index="0"] [data-app-action="remove-row"]');
+  await ui.click('[data-config-collection="catalogOverrides"] [data-config-index="0"] [data-app-action="edit-catalog-override"]');
   assert.equal(ui.field("name").value, "Second");
   assert.equal(ui.field("description").value, "second");
   assert.equal(ui.field("bonus").value, "7");
