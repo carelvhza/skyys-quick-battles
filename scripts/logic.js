@@ -469,17 +469,15 @@ export function selectedCatalogBonuses(catalog, actorItems) {
     const isLayOnHands = entry.name.toLocaleLowerCase() === "lay on hands";
     const resourceCostPerUse = isLayOnHands ? 20 : 1;
     const available = Math.floor(uses.available / resourceCostPerUse);
-    if (available > 0) {
-      activeEntries.push({
-        name: entry.name,
-        bonusPerUse: isLayOnHands ? 1 : finiteNumber(entry.bonusPerUse ?? entry.bonus),
-        available,
-        ...(isLayOnHands ? { resourceCostPerUse, resourceAvailable: uses.available } : {}),
-        updatePath: uses.updatePath,
-        current: uses.current,
-        itemId: item.id
-      });
-    }
+    activeEntries.push({
+      name: entry.name,
+      bonusPerUse: isLayOnHands ? 1 : finiteNumber(entry.bonusPerUse ?? entry.bonus),
+      available,
+      ...(isLayOnHands ? { resourceCostPerUse, resourceAvailable: uses.available } : {}),
+      updatePath: uses.updatePath,
+      current: uses.current,
+      itemId: item.id
+    });
   }
 
   return { passiveBonus, passiveEntries, activeEntries };

@@ -122,12 +122,13 @@ test("participant totals remain outside the scroll area and the resource limit d
   assert.equal(root.querySelector("[data-combined-bonus]").textContent, "+6");
 });
 
-test("active feature steppers change values by one within resource bounds and update totals", async () => {
+test("feature and spell steppers respect shared and individual limits", async () => {
   const dom = new JSDOM(template({
     isParticipant: true, actor: { name: "Hero" },
     passive: { abilityName: "STR", total: 1 }, passiveEntries: [],
-    activeItems: [{ name: "Rage", itemId: "rage", bonusPerUse: 2, available: 2 }],
-    spellSlots: [], maxActiveUses: 1, dc: 15
+    activeItems: [{ name: "Rage", itemId: "rage", bonusPerUse: 2, available: 2 },
+      { name: "Lucky", itemId: "lucky", bonusPerUse: 1, available: 0 }],
+    spellSlots: [{ level: 1, bonus: 1, available: 1 }, { level: 2, bonus: 2, available: 0 }], maxActiveUses: 2, dc: 15
   }));
   class ApplicationV2 { constructor(options) { this.options = options; } async _onRender() {} }
   const context = {
@@ -139,21 +140,44 @@ test("active feature steppers change values by one within resource bounds and up
   const app = new context.App({ mode: "participant" });
   app.element = dom.window.document.querySelector(".qb-shell");
   await app._onRender({}, {});
-  const increase = app.element.querySelector('[data-resource-step="1"]');
-  const decrease = app.element.querySelector('[data-resource-step="-1"]');
+  const [feature, depleted, spell, depletedSpell] = app.element.querySelectorAll(".qb-resource-stepper");
+  const plus = (row) => row.querySelector('[data-resource-step="1"]');
+  const minus = (row) => row.querySelector('[data-resource-step="-1"]');
   const input = app.element.querySelector('[name="active-rage"]');
-  decrease.click();
+  assert.equal(minus(feature).disabled, true);
+  assert.equal(plus(depleted).disabled, true);
+  assert.equal(minus(depleted).disabled, true);
+  assert.equal(depleted.querySelector("input").disabled, true);
+  assert.equal(plus(depletedSpell).disabled, true);
+  assert.equal(minus(depletedSpell).disabled, true);
+  minus(feature).click();
   assert.equal(input.value, "0");
-  increase.click();
+  plus(feature).click();
   assert.equal(input.value, "1");
   assert.equal(app.element.querySelector("[data-combined-bonus]").textContent, "+3");
-  increase.click();
-  increase.click();
-  assert.equal(input.value, "2");
-  assert.equal(app.element.querySelector('[data-app-action="submit-check"]').disabled, true);
-  decrease.click();
-  assert.equal(input.value, "1");
+  plus(spell).click();
+  assert.equal(spell.querySelector("input").value, "1");
+  assert.equal(plus(spell).disabled, true);
+  assert.equal(plus(feature).disabled, true);
   assert.equal(app.element.querySelector('[data-app-action="submit-check"]').disabled, false);
+  minus(spell).click();
+  assert.equal(plus(feature).disabled, false);
+  plus(feature).click();
+  assert.equal(plus(feature).disabled, true);
+  assert.equal(plus(spell).disabled, true);
+  input.value = "3";
+  input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  assert.equal(app.element.querySelector('[data-app-action="submit-check"]').disabled, true);
+  minus(feature).click();
+  assert.equal(input.value, "2");
+  assert.equal(app.element.querySelector('[data-app-action="submit-check"]').disabled, false);
+  minus(feature).click();
+  plus(spell).click();
+  assert.equal(plus(spell).disabled, true);
+  assert.equal(plus(feature).disabled, true);
+  minus(feature).click();
+  assert.equal(plus(feature).disabled, false);
+  assert.equal(plus(spell).disabled, true);
 });
 
 test("active spend plans retain D&D 5e spent updates and record each selected bonus", () => {
@@ -174,6 +198,37 @@ test("active spend plans retain D&D 5e spent updates and record each selected bo
   assert.equal(plan.updates[0]["system.uses.spent"], 3);
   assert.equal(plan.entries[0].name, "Rage × 2");
   assert.equal(plan.entries[0].bonus, 4);
+});
+
+test("pending checks retain features depleted after the prompt was created", async () => {
+  class ApplicationV2 { constructor(options) { this.options = options; } }
+  const payload = {
+    status: "pending", actorUuid: "Actor.1", config: { maxActiveUses: 6 },
+    preview: {
+      actor: { name: "Hero" }, passive: { total: 0 }, passiveEntries: [], spellSlots: [], spells: [],
+      activeItems: [{ name: "Lucky", itemId: "lucky", available: 2, bonusPerUse: 1 }]
+    }
+  };
+  const actor = {
+    items: new Map([["lucky", { system: { uses: { max: 2, spent: 2 } } }]]),
+    system: { spells: {} }, testUserPermission: () => true
+  };
+  const context = {
+    foundry: { applications: { api: { ApplicationV2, HandlebarsApplicationMixin: (base) => base } } },
+    MODULE_ID: "test", TEMPLATE: "template", DEFAULT_CONFIG: { maxActiveUses: 6 }, itemUses, availableSpellSlots,
+    game: { user: { isGM: false } }, findMessageByFlag: () => ({ flags: { test: payload } }),
+    actorByUuid: async () => actor
+  };
+  vm.createContext(context);
+  vm.runInContext(`${part("function passiveWithoutHp(", "\nasync function nativeD20(")}
+    ${part("class QuickBattlesApplication", "\nfunction renderParticipantResult(")}\nthis.App = QuickBattlesApplication;`, context);
+  const app = new context.App({ mode: "participant", checkId: "check" });
+  const result = await app._prepareParticipantContext();
+  assert.equal(result.activeItems.length, 1);
+  assert.equal(result.activeItems[0].available, 0);
+  const document = new JSDOM(template({ ...result, isParticipant: true })).window.document;
+  assert.equal(document.querySelector('[name="active-lucky"]').disabled, true);
+  assert.equal(document.querySelector('[aria-label="Increase Lucky uses"]').disabled, true);
 });
 
 test("legacy pending prompts remove HP from both the displayed and submitted bonuses", async () => {
