@@ -183,6 +183,21 @@ export function calculatePassiveBonuses({ abilities = {}, ac = 0, catalogBonus =
   return bonuses;
 }
 
+export function spellcastingBonus(items = []) {
+  const fullCasters = new Set(["bard", "cleric", "druid", "sorcerer", "wizard"]);
+  let fullLevels = 0;
+  let warlockLevels = 0;
+  for (const item of items) {
+    if (item.type !== "class") continue;
+    const identifier = String(item.system?.identifier || item.name || "").trim().toLowerCase();
+    const levels = Math.max(0, Math.floor(finiteNumber(item.system?.levels, 0)));
+    if (fullCasters.has(identifier)) fullLevels += levels;
+    else if (identifier === "warlock") warlockLevels += levels;
+  }
+  return (fullLevels > 0 ? Math.max(1, Math.floor(fullLevels / 4)) : 0)
+    + (warlockLevels > 0 ? Math.max(1, Math.floor(warlockLevels / 8)) : 0);
+}
+
 export function averageRoundedDown(values) {
   if (!Array.isArray(values) || values.length === 0) {
     throw new Error("At least one roll is required to calculate a group average.");

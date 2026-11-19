@@ -30,6 +30,9 @@ test("new difficulty defaults include exact damage values and survival settings"
   ]);
   assert.equal(config.keepOneHp, true);
   assert.equal(config.damageCap, 1);
+  assert.equal(config.maxActiveUses, 6);
+  assert.equal(context.normalize({ maxActiveUses: 5 }).maxActiveUses, 5);
+  assert.equal(context.normalize({ maxActiveUses: 0 }).maxActiveUses, 0);
 });
 
 test("legacy bands retain custom fields and migrate missing damage without changing configuration", () => {

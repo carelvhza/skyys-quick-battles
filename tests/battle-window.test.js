@@ -4,13 +4,91 @@ import test from "node:test";
 import vm from "node:vm";
 import Handlebars from "handlebars";
 import { JSDOM } from "jsdom";
-import { activeUseCount, capDamageAtOneHp, d20ModifierParts, failureDamage, isRunActive, itemUses, resourceBonus, spellSlotSpendPlan } from "../scripts/logic.js";
+import { activeUseCount, availableSpellSlots, calculatePassiveBonuses, capDamageAtOneHp, d20ModifierParts, failureDamage, isRunActive, itemUses, resourceBonus, spellcastingBonus, spellSlotSpendPlan } from "../scripts/logic.js";
 
 const source = await readFile(new URL("../scripts/quick-battles.js", import.meta.url), "utf8");
 const html = await readFile(new URL("../templates/quick-battles.hbs", import.meta.url), "utf8");
 Handlebars.registerHelper("signed", (value) => `${Number(value) >= 0 ? "+" : ""}${Number(value) || 0}`);
 const template = Handlebars.compile(html);
 const part = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
+
+test("class-based spellcasting appears once in participant totals, list, and chat", () => {
+  const context = {
+    selectedCatalogBonuses: () => ({ passiveBonus: 2, passiveEntries: [{ name: "Aura", bonus: 2 }], activeEntries: [] }),
+    spellcastingBonus, calculatePassiveBonuses, availableSpellSlots,
+    escapeHtml: (value) => String(value ?? ""), chatCard: (content) => `<article>${content}</article>`
+  };
+  vm.createContext(context);
+  vm.runInContext(`${part("function classLine(", "\nfunction actorOwners(")}
+    ${part("function participantDice(", "\nasync function cardAction(")}
+    this.preview = participantPreview; this.render = renderParticipantResult;`, context);
+  const actor = {
+    uuid: "Actor.1", name: "Hero",
+    items: [{ type: "class", name: "Wizard", system: { identifier: "wizard", levels: 8 } },
+      { type: "class", name: "Warlock", system: { identifier: "warlock", levels: 2 } }],
+    system: { abilities: { int: { mod: 3 } }, attributes: { ac: { value: 16 }, hp: { value: 20, max: 20 } }, spells: {} }
+  };
+  const preview = context.preview(actor, [], { spellSlotBonuses: {} });
+  assert.equal(preview.passive.total, 8);
+  assert.equal(preview.passiveEntries.filter((entry) => entry.name === "Spellcasting").length, 1);
+  assert.equal(preview.passiveEntries.find((entry) => entry.name === "Spellcasting").bonus, 3);
+  const document = new JSDOM(template({ ...preview, isParticipant: true, maxActiveUses: 6, dc: 15 })).window.document;
+  assert.match(document.querySelector(".qb-bonus-list").textContent, /Spellcasting\s*\+3/);
+  assert.equal(document.querySelector("[data-passive-bonus]").dataset.passiveBonus, "8");
+  const details = { ...preview, actorName: actor.name, actorImg: "", dc: 15, total: 20, passed: true,
+    activeEntries: [], activeBonus: 0, slotBonus: 0, situational: 0, dice: [12] };
+  assert.match(new JSDOM(context.render(details, false)).window.document.querySelector(".qb-check-breakdowns").textContent, /Spellcasting\s*\+3/);
+  actor.items = [{ type: "class", name: "Fighter", system: { identifier: "fighter", levels: 20 } }];
+  assert.equal(context.preview(actor, [], { spellSlotBonuses: {} }).passiveEntries.some((entry) => entry.name === "Spellcasting"), false);
+});
+
+test("cancelling deletes only pending prompts for that run after persisting cancellation", async () => {
+  class ApplicationV2 { async render() {} }
+  const events = [];
+  const run = { id: "run", status: "checks-pending" };
+  const message = (runId, type, status) => ({
+    flags: { test: { runId, type, status } },
+    delete: async () => { assert.equal(run.status, "cancelled"); events.push(type); }
+  });
+  const context = {
+    foundry: { applications: { api: { ApplicationV2, HandlebarsApplicationMixin: (base) => base } } },
+    MODULE_ID: "test", TEMPLATE: "template",
+    game: { messages: [message("run", "fate-request", "pending"), message("run", "stealth-request", "pending"),
+      message("run", "check-prompt", "pending"), message("other", "check-prompt", "pending"),
+      message("run", "participant-submission", "pending"), message("run", "fate-request", "resolved")] },
+    currentRun: async () => ({ run, message: null }),
+    persistRun: async () => { assert.equal(run.status, "cancelled"); events.push("persist"); }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${part("class QuickBattlesApplication", "\nfunction renderParticipantResult(")}\nthis.App = QuickBattlesApplication;`, context);
+  await new context.App()._cancelRun();
+  assert.deepEqual(events, ["persist", "fate-request", "stealth-request", "check-prompt"]);
+});
+
+test("Fate and Stealth rolls cancelled while the dialog is open are not submitted", async () => {
+  const run = { status: "fate-pending", fate: {
+    requestId: "fate", paceModifier: 0, situational: 0, campModifier: 0,
+    stealthRequests: [{ requestId: "stealth", total: null }]
+  } };
+  let submissions = 0;
+  const context = {
+    MODULE_ID: "test", inFlight: new Set(), game: { user: { isGM: true, id: "gm" } },
+    findMessageByFlag: () => ({ flags: { test: { status: "pending" } } }),
+    currentRun: async () => ({ run }), gmUserIds: () => ["gm"],
+    nativeD20: async () => { run.status = "cancelled"; return { toMessage: async () => { submissions++; } }; },
+    actorByUuid: async () => ({
+      name: "Hero", rollSkill: async () => { run.status = "cancelled"; return [{ total: 10 }]; }
+    }),
+    ChatMessage: { getSpeaker: () => ({}), create: async () => { submissions++; } }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${part("async function submitFateRoll(", "\nasync function openParticipantApplication(")}
+    this.fate = submitFateRoll; this.stealth = submitStealthRoll;`, context);
+  await assert.rejects(() => context.fate("run", "fate", "gm"), /no longer pending/);
+  run.status = "fate-pending";
+  await assert.rejects(() => context.stealth("run", "stealth", "Actor.1", "gm"), /no longer pending/);
+  assert.equal(submissions, 0);
+});
 
 test("participant totals remain outside the scroll area and the resource limit disables rolling live", () => {
   const dom = new JSDOM(template({
@@ -109,8 +187,9 @@ test("legacy pending prompts remove HP from both the displayed and submitted bon
     name: "Hero", uuid: "Actor.1", items: new Map(),
     system: { attributes: { hp: { max: 100, value: 100 } } }, testUserPermission: () => true
   };
-  const run = { status: "checks-pending", selectedEncounter: { damage: 4, damageCap: 1, keepOneHp: false }, fateResult: { difficulty: { dc: 19 } } };
-  let rolledModifier, sent;
+  const run = { status: "checks-pending", selectedEncounter: { damage: 4, damageCap: 1, keepOneHp: false },
+    fateResult: { difficulty: { dc: 19 } }, checks: { "Actor.1": { checkId: "check", status: "pending" } } };
+  let rolledModifier, sent, spends = 0;
   const context = {
     foundry: { applications: { api: { ApplicationV2, HandlebarsApplicationMixin: (base) => base } } },
     MODULE_ID: "test", TEMPLATE: "template", DEFAULT_CONFIG: {}, inFlight: new Set(),
@@ -121,7 +200,7 @@ test("legacy pending prompts remove HP from both the displayed and submitted bon
     currentRun: async () => ({ run }), readConfig: async () => ({ damageCap: 0.1, keepOneHp: true }),
     bandWithDamage: () => ({ damage: 99 }),
     nativeD20: async (_actor, modifier) => { rolledModifier = modifier; return { total: 15 }; },
-    applyResourceUpdates: async () => {}, failureDamage, participantDice: () => 12,
+    applyResourceUpdates: async () => { spends++; }, failureDamage, participantDice: () => 12,
     ChatMessage: { getSpeaker: () => ({}), create: async (data) => { sent = data; } },
     renderParticipantResult: () => "", removeOpenCheckButton: () => {}
   };
@@ -137,6 +216,9 @@ test("legacy pending prompts remove HP from both the displayed and submitted bon
   assert.equal(rolledModifier, 3);
   assert.equal(sent.flags.test.details.passive.total, 3);
   assert.equal(sent.flags.test.details.damage, 20);
+  context.nativeD20 = async () => { run.status = "cancelled"; return { total: 15 }; };
+  await assert.rejects(() => app._submitParticipantCheck(), /no longer pending/);
+  assert.equal(spends, 1);
 });
 
 test("GM party shows selection before checks and status cards with damage after checks", () => {
