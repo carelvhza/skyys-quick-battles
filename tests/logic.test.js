@@ -19,6 +19,7 @@ import {
   resourceBonus,
   reassignEncounterGroup,
   selectedCatalogBonuses,
+  spellcastingBonus,
   spellSlotBonus,
   spellSlotSpendPlan,
   submittedRollTotal,
@@ -164,9 +165,9 @@ test("run recovery is persisted without creating a GM-only run chat card", () =>
 });
 
 test("older saved configurations inherit the new active-use default", () => {
-  assert.match(applicationSource, /maxActiveUses: 5/);
+  assert.match(applicationSource, /maxActiveUses: 6/);
   assert.match(applicationSource, /const config = \{\s*\.\.\.clone\(DEFAULT_CONFIG\),\s*\.\.\.candidate/);
-  assert.match(applicationSource, /maxActiveUses: payload\.config\?\.maxActiveUses \?\? 5/);
+  assert.match(applicationSource, /maxActiveUses: payload\.config\?\.maxActiveUses \?\? DEFAULT_CONFIG\.maxActiveUses/);
 });
 
 test("native D20 roll configurations initialize the D&D 5e roll options", () => {
@@ -471,6 +472,29 @@ test("current HP does not affect the passive bonus", () => {
     assert.equal(result.total, 0);
     assert.equal("hp" in result, false);
   }
+});
+
+test("spellcasting bonus sums full-caster levels and warlock levels separately", () => {
+  const classItem = (name, levels, identifier = name.toLowerCase()) => ({ type: "class", name, system: { identifier, levels } });
+  const bonus = (...classes) => spellcastingBonus(classes);
+  assert.equal(bonus(), 0);
+  for (const name of ["Druid", "Bard", "Cleric", "Sorcerer", "Wizard"]) {
+    assert.equal(bonus(classItem(name, 1)), 1, name);
+    assert.equal(bonus(classItem(name, 8)), 2, name);
+  }
+  for (const [level, expected] of [[1, 1], [3, 1], [4, 1], [7, 1], [8, 2], [12, 3], [20, 5]]) {
+    assert.equal(bonus(classItem("Wizard", level)), expected);
+  }
+  for (const [level, expected] of [[1, 1], [7, 1], [8, 1], [15, 1], [16, 2], [20, 2]]) {
+    assert.equal(bonus(classItem("Warlock", level)), expected);
+  }
+  assert.equal(bonus(classItem("Cleric", 3), classItem("Wizard", 5)), 2);
+  assert.equal(bonus(classItem("Wizard", 3), classItem("Warlock", 1)), 2);
+  assert.equal(bonus(classItem("Bard", 8), classItem("Warlock", 16)), 4);
+  assert.equal(bonus(...["Artificer", "Fighter", "Barbarian", "Rogue", "Ranger", "Paladin", "Monk"].map((name) => classItem(name, 20))), 0);
+  assert.equal(bonus(classItem("Wizard", 0), { type: "feat", name: "Wizard", system: { levels: 20 } }), 0);
+  assert.equal(bonus(classItem("Renamed", 8, "wizard")), 2);
+  assert.equal(bonus({ type: "class", name: "Wizard", system: { levels: 8 } }), 2);
 });
 
 test("group Stealth average rounds down", () => {

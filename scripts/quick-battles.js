@@ -16,6 +16,7 @@ import {
   reassignEncounterGroup,
   resourceBonus,
   selectedCatalogBonuses,
+  spellcastingBonus,
   spellSlotSpendPlan,
   submittedRollTotal,
   validateActiveUseLimit
@@ -42,7 +43,7 @@ const DEFAULT_CONFIG = {
     { min: 19, max: 19, label: "Deadly", dc: 34, damage: 10 },
     { min: 20, max: 20, label: "Combat!", dc: 0, damage: 0, combat: true }
   ],
-  maxActiveUses: 5,
+  maxActiveUses: 6,
   damageCap: 1,
   keepOneHp: true,
   postGmResults: true
@@ -471,10 +472,13 @@ function actorAbilities(actor) {
 function participantPreview(actor, catalog, config) {
   const items = Array.from(actor.items ?? []);
   const catalogBonuses = selectedCatalogBonuses(catalog, items);
+  const spellcasting = spellcastingBonus(items);
+  const passiveEntries = [...catalogBonuses.passiveEntries];
+  if (spellcasting > 0) passiveEntries.push({ name: "Spellcasting", bonus: spellcasting });
   const passive = calculatePassiveBonuses({
     abilities: actorAbilities(actor),
     ac: actor.system?.attributes?.ac?.value,
-    catalogBonus: catalogBonuses.passiveBonus
+    catalogBonus: catalogBonuses.passiveBonus + spellcasting
   });
   const hp = Number(actor.system?.attributes?.hp?.value) || 0;
   const maxHp = Number(actor.system?.attributes?.hp?.max) || 0;
@@ -495,7 +499,7 @@ function participantPreview(actor, catalog, config) {
     },
     maxHp,
     passive,
-    passiveEntries: catalogBonuses.passiveEntries,
+    passiveEntries,
     activeItems: catalogBonuses.activeEntries,
     spellSlots,
     spells
@@ -1456,7 +1460,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       passiveEntries: expected.passiveEntries,
       activeItems,
       spellSlots,
-      maxActiveUses: payload.config?.maxActiveUses ?? 5,
+      maxActiveUses: payload.config?.maxActiveUses ?? DEFAULT_CONFIG.maxActiveUses,
       spells: expected.spells,
       situational: payload.situational,
       dc: payload.dc
@@ -1616,10 +1620,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     for (const message of Array.from(game.messages)) {
       const flag = message.flags?.[MODULE_ID];
       if (flag?.runId !== current.run.id || !pendingTypes.has(flag.type) || flag.status !== "pending") continue;
-      await message.update({
-        content: chatCard("<h3>Quick Battles · Cancelled</h3><p>This Quick Battle was cancelled by the GM.</p>"),
-        [`flags.${MODULE_ID}.status`]: "cancelled"
-      });
+      await message.delete();
     }
     await this.render();
   }
@@ -1787,6 +1788,12 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       const totalModifier = passive.total + activePlan.bonus + slotPlan.bonus + situational;
       const roll = await nativeD20(actor, totalModifier, `Quick Battle check · ${actor.name}`);
       if (!roll) return;
+      const latest = await currentRun(payload.runId);
+      if (!latest || latest.run.status !== "checks-pending"
+        || latest.run.checks?.[payload.actorUuid]?.checkId !== checkId
+        || latest.run.checks[payload.actorUuid].status !== "pending") {
+        throw new Error("This participant check is no longer pending.");
+      }
       await applyResourceUpdates(actor, activePlan.updates, slotPlan.updates);
       const total = Number(roll.total);
       const passed = total >= Number(payload.dc);
@@ -1960,6 +1967,10 @@ async function submitFateRoll(runId, requestId, userId) {
   try {
     const roll = await nativeD20(null, modifiers, "Quick Battles Fate d20");
     if (!roll) return;
+    const latest = await currentRun(runId);
+    if (!latest || latest.run.status !== "fate-pending" || latest.run.fate.requestId !== requestId) {
+      throw new Error("This Fate roll is no longer pending.");
+    }
     await roll.toMessage({
       flavor: "Quick Battles Fate d20",
       whisper: [...new Set([...gmUserIds(), game.user.id])],
@@ -1978,6 +1989,11 @@ async function submitStealthRoll(runId, requestId, actorUuid, userId) {
   }
   const prompt = findMessageByFlag("stealth-request", "requestId", requestId);
   if (!prompt || prompt.flags?.[MODULE_ID]?.status !== "pending") throw new Error("This Stealth check is no longer pending.");
+  const current = await currentRun(runId);
+  if (!current || current.run.status !== "fate-pending"
+    || !current.run.fate.stealthRequests?.some((request) => request.requestId === requestId && request.total == null)) {
+    throw new Error("This Stealth check is no longer pending.");
+  }
   const lockKey = `stealth:${requestId}`;
   if (inFlight.has(lockKey)) return;
   inFlight.add(lockKey);
@@ -1993,6 +2009,11 @@ async function submitStealthRoll(runId, requestId, actorUuid, userId) {
     );
     const roll = rolls?.[0];
     if (!roll) return;
+    const latest = await currentRun(runId);
+    if (!latest || latest.run.status !== "fate-pending"
+      || !latest.run.fate.stealthRequests?.some((request) => request.requestId === requestId && request.total == null)) {
+      throw new Error("This Stealth check is no longer pending.");
+    }
     await ChatMessage.create({
       content: `<p>${escapeHtml(actor.name)} Stealth check: ${roll.total}</p>`,
       whisper: [...new Set([...gmUserIds(), game.user.id])],
@@ -2010,6 +2031,12 @@ async function openParticipantApplication(checkId) {
   const payload = prompt?.flags?.[MODULE_ID];
   if (!payload || payload.status !== "pending" || findParticipantSubmission(checkId)) {
     removeOpenCheckButton(checkId);
+    throw new Error("This participant check is no longer pending.");
+  }
+  const current = await currentRun(payload.runId);
+  if (!current || current.run.status !== "checks-pending"
+    || current.run.checks?.[payload.actorUuid]?.checkId !== checkId
+    || current.run.checks[payload.actorUuid].status !== "pending") {
     throw new Error("This participant check is no longer pending.");
   }
   const actor = await actorByUuid(payload.actorUuid);
