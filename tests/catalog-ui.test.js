@@ -91,8 +91,10 @@ test("feature catalog settings align beneath Results and damage with a compact p
   assert.equal(save.textContent, "Save Settings");
   assert.match(styles, /\.qb-config-summary-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(styles, /\.qb-config-result-column\s*\{\s*display:\s*grid;[^}]*gap:\s*0\.85rem;/);
-  assert.match(styles, /\.qb-config-save\s*\{[^}]*position:\s*sticky;[^}]*bottom:\s*0\.65rem;[^}]*justify-self:\s*start;/);
-  assert.match(styles, /\.qb-config-shell\s*\{[^}]*overflow:\s*visible;[^}]*padding-bottom:\s*4\.25rem;/);
+  assert.equal(save.closest(".qb-config-toolbar").querySelector("h2").textContent, "Quick Battles settings");
+  assert.equal(ui.query(".qb-configuration-form").firstElementChild.className, "qb-config-toolbar");
+  assert.match(styles, /\.qb-config-toolbar\s*\{[^}]*justify-content:\s*space-between;[^}]*position:\s*sticky;[^}]*top:\s*0;/);
+  assert.match(styles, /\.qb-config-shell\s*\{[^}]*overflow:\s*visible;/);
   assert.match(styles, /@container quick-battles \(max-width: 40rem\)[\s\S]*?\.qb-config-summary-grid\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
 });
 

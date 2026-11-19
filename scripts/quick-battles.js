@@ -549,12 +549,14 @@ function updateActiveBonusPreview(element) {
   const limit = Number(preview.dataset.maxActiveUses);
   const feedback = preview.querySelector("[data-active-use-feedback]");
   const overLimit = count > limit;
+  const passive = Number(element.querySelector("[data-passive-bonus]")?.dataset.passiveBonus ?? 0);
+  const combined = passive + bonus;
   const submit = element.querySelector('[data-app-action="submit-check"]');
   if (submit) submit.disabled = overLimit;
   preview.querySelector("[data-bonus-total]").textContent = `${bonus >= 0 ? "+" : ""}${bonus}`;
-  feedback.textContent = overLimit
-    ? `${count} selected; maximum is ${limit}. Reduce selected uses before rolling.`
-    : `${count} of ${limit} active feats or spells selected.`;
+  const combinedTotal = element.querySelector("[data-combined-bonus]");
+  if (combinedTotal) combinedTotal.textContent = `${combined >= 0 ? "+" : ""}${combined}`;
+  feedback.textContent = `${count}/${limit} active resources`;
   feedback.dataset.overLimit = String(overLimit);
 }
 
@@ -1340,6 +1342,9 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
         name: actor.name,
         img: actor.img || "icons/svg/mystery-man.svg",
         level,
+        hp: Number(actor.system?.attributes?.hp?.value) || 0,
+        maxHp: Number(actor.system?.attributes?.hp?.max) || 0,
+        ac: Number(actor.system?.attributes?.ac?.value) || 0,
         defaultSelected: selectedIds.has(entry.actorUuid),
         checkStatus: check?.statusLabel ?? "",
         status: check?.status ?? "pending",
@@ -1441,6 +1446,17 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     if (this.element?.dataset.qbBound) return;
     this.element.dataset.qbBound = "true";
     this.element.addEventListener("click", (event) => {
+      const step = event.target.closest("[data-resource-step]");
+      if (step && this.mode === "participant") {
+        event.preventDefault();
+        const input = step.closest(".qb-resource-stepper").querySelector("[data-bonus-count]");
+        const min = Number(input.min);
+        const max = Number(input.max);
+        const current = Number(input.value);
+        input.value = String(Math.max(min, Math.min(max, (Number.isFinite(current) ? current : min) + Number(step.dataset.resourceStep))));
+        updateActiveBonusPreview(this.element);
+        return;
+      }
       const button = event.target.closest("[data-app-action]");
       if (!button) return;
       event.preventDefault();
@@ -1759,6 +1775,14 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
         damagePercent: Math.round(damage.fraction * 100),
         passive: preview.passive,
         passiveEntries: preview.passiveEntries,
+        activeEntries: [
+          ...activePlan.entries,
+          ...Object.entries(slotPlan.spends).map(([level, count]) => ({
+            name: `Level ${level} spell slot × ${count}`,
+            bonus: count * config.spellSlotBonuses[level]
+          }))
+        ],
+        dice: participantDice(roll),
         activeBonus: activePlan.bonus,
         slotBonus: slotPlan.bonus,
         situational,
@@ -1790,6 +1814,7 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
     let bonus = 0;
     let countSpent = 0;
     const updates = [];
+    const entries = [];
     for (const option of options) {
       const input = this.element.querySelector(`[name="active-${CSS.escape(option.itemId)}"]`);
       const rawCount = numberValue(input?.value ?? 0, `${option.name} uses`);
@@ -1809,8 +1834,9 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
       const itemBonus = count * option.bonusPerUse;
       bonus += itemBonus;
       countSpent += count;
+      entries.push({ name: `${option.name} × ${count}`, bonus: itemBonus });
     }
-    return { bonus, updates, count: countSpent };
+    return { bonus, updates, entries, count: countSpent };
   }
 
   _slotSpendPlan(actor, slots, bonusesByLevel) {
@@ -1827,17 +1853,30 @@ class QuickBattlesApplication extends foundry.applications.api.HandlebarsApplica
   }
 }
 
+function participantDice(roll) {
+  const die = roll?.dice?.find((entry) => Number(entry.faces) === 20);
+  return (die?.results ?? [])
+    .filter((entry) => entry.active !== false && entry.discarded !== true && Number.isFinite(Number(entry.result)))
+    .map((entry) => Number(entry.result));
+}
+
 function renderParticipantResult(details, damageApplied) {
   const result = details.passed
     ? `<strong class="qb-check-outcome">SUCCESS</strong>`
     : `<strong class="qb-check-outcome">FAILED by ${details.margin}</strong>`;
   const signed = (value) => `${Number(value) >= 0 ? "+" : ""}${Number(value) || 0}`;
   const passiveBreakdown = [
-    `${details.passive.abilityName} ${signed(details.passive.ability)}`,
-    `HP ${signed(details.passive.hp)}`,
-    `AC ${signed(details.passive.armor)}`,
-    ...details.passiveEntries.map((entry) => `${escapeHtml(entry.name)} ${signed(entry.bonus)}`)
-  ].join(", ");
+    { name: details.passive.abilityName, bonus: details.passive.ability },
+    { name: "HP", bonus: details.passive.hp },
+    { name: "AC", bonus: details.passive.armor },
+    ...details.passiveEntries
+  ];
+  const activeBreakdown = details.activeEntries ?? [
+    { name: "Active features", bonus: details.activeBonus },
+    { name: "Spell slots", bonus: details.slotBonus }
+  ];
+  const rows = (entries) => entries.map((entry) => `<div><dt>${escapeHtml(entry.name)}</dt><dd>${signed(entry.bonus)}</dd></div>`).join("");
+  const dice = details.dice?.length ? `<div class="qb-check-dice">d20: ${details.dice.map(escapeHtml).join(", ")}</div>` : "";
   const damage = details.passed
     ? "<div>Encounter check passed.</div>"
     : damageApplied
@@ -1847,9 +1886,11 @@ function renderParticipantResult(details, damageApplied) {
         : "<div>No damage to apply.</div>";
   return chatCard(
     `<header><img src="${escapeHtml(details.actorImg)}" alt="" /><h3>${escapeHtml(details.actorName)} vs DC ${details.dc}</h3></header>
-     <div>Passive: ${signed(details.passive.total)} (${passiveBreakdown})</div>
-     <div>Active: ${signed(details.activeBonus)} · Spell slots: ${signed(details.slotBonus)} · Situation: ${signed(details.situational)}</div>
-     <div class="qb-check-roll">Roll <strong>${details.total}</strong> vs DC ${details.dc} · ${result}</div>${damage}`,
+     <div class="qb-check-breakdowns">
+       <section><h4>Passive ${signed(details.passive.total)}</h4><dl>${rows(passiveBreakdown)}</dl></section>
+       <section><h4>Active ${signed(Number(details.activeBonus) + Number(details.slotBonus))}</h4><dl>${rows(activeBreakdown)}${rows([{ name: "Situation", bonus: details.situational }])}</dl></section>
+     </div>
+     ${dice}<div class="qb-check-roll">Roll <strong>${details.total}</strong> vs DC ${details.dc} · ${result}</div>${damage}`,
     details.passed ? "qb-check-success" : "qb-check-failure"
   );
 }
@@ -2117,6 +2158,7 @@ async function processParticipantSubmission(message, data) {
   } else if (check.status !== "processing" || check.submissionId !== message.id) return;
   const total = submittedRoll(message);
   const details = data.details;
+  details.dice ??= participantDice(message.rolls?.[0]);
   const passed = total >= Number(current.run.selectedEncounter.dc);
   const config = await readConfig();
   const damage = passed
