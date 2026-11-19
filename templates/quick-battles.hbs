@@ -10,12 +10,15 @@
       </header>
 
       <div class="qb-check-totals">
-        <div class="qb-active-bonus-preview qb-passive-bonus-preview">
+        <div class="qb-active-bonus-preview qb-passive-bonus-preview" data-passive-bonus="{{passive.total}}">
           <span>Total passive</span><strong>{{signed passive.total}}</strong>
         </div>
         <div class="qb-active-bonus-preview" data-active-bonus-preview data-max-active-uses="{{maxActiveUses}}" role="status" aria-live="polite" aria-atomic="true">
           <span>Total active <small data-active-use-feedback></small></span>
           <strong data-bonus-total>+0</strong>
+        </div>
+        <div class="qb-active-bonus-preview qb-combined-bonus-preview" role="status" aria-live="polite">
+          <span>Total bonus</span><strong data-combined-bonus>{{signed passive.total}}</strong>
         </div>
       </div>
       <div class="qb-check-scroll">
@@ -41,10 +44,14 @@
         {{#if activeItems.length}}
           <div class="qb-resource-list">
             {{#each activeItems}}
-              <label class="qb-resource-row">
+              <div class="qb-resource-row">
                 <span>{{name}} <small>+{{bonusPerUse}} each · {{#if resourceCostPerUse}}{{available}} ({{resourceAvailable}}/{{resourceCostPerUse}}){{else}}{{available}}{{/if}} available</small></span>
-                <input name="active-{{itemId}}" type="number" min="0" max="{{available}}" value="0" data-bonus-count data-bonus-per-use="{{bonusPerUse}}" />
-              </label>
+                <div class="qb-resource-stepper">
+                  <button type="button" data-resource-step="-1" aria-label="Decrease {{name}} uses">−</button>
+                  <input name="active-{{itemId}}" type="number" min="0" max="{{available}}" value="0" data-bonus-count data-bonus-per-use="{{bonusPerUse}}" aria-label="{{name}} uses" />
+                  <button type="button" data-resource-step="1" aria-label="Increase {{name}} uses">+</button>
+                </div>
+              </div>
             {{/each}}
           </div>
         {{else}}
@@ -85,8 +92,8 @@
           <section class="qb-section qb-current-run {{#if state.fateResult.failed}}qb-threat-run{{/if}}">
             <header class="qb-section-heading">
               <div>
-                <span class="qb-eyebrow">Quick Battle</span>
-                <h2>Current run</h2>
+                <h2>Quick Battle</h2>
+                <span class="qb-eyebrow">Current run</span>
               </div>
               {{#if checksComplete}}
                 <span class="qb-stage-badge">Complete</span>
@@ -177,14 +184,14 @@
           <section class="qb-section qb-encounter-section">
             <header class="qb-section-heading">
               <div>
-                <span class="qb-eyebrow">Choose encounter</span>
                 <h2>Encounter</h2>
+                <span class="qb-eyebrow">Select</span>
               </div>
               <span class="qb-stage-badge">01</span>
             </header>
             <label class="qb-field">
               <span>Encounter group / area</span>
-              <select name="encounter-group">
+              <select name="encounter-group" {{#if checksComplete}}disabled{{/if}}>
                 {{#each groups}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
               </select>
             </label>
@@ -233,8 +240,8 @@
                 {{#if checkStatus}}
                   <article class="qb-party-card">
                     <img src="{{img}}" alt="" />
-                    <div><strong>{{name}}</strong><span>Level {{level}}</span><span class="qb-party-status qb-party-status-{{status}}">{{checkStatus}}</span>{{#if damageApplied}}<small>Damage applied</small>{{/if}}</div>
-                    {{#if canApplyDamage}}<button type="button" class="qb-secondary" data-app-action="apply-party-damage" data-actor-uuid="{{uuid}}">Apply {{damage}} damage</button>{{/if}}
+                    <div><strong>{{name}} (Level {{level}})</strong><span>HP {{hp}}/{{maxHp}} · AC {{ac}}</span><span class="qb-party-status qb-party-status-{{status}}">{{checkStatus}}</span>{{#if damageApplied}}<small>Damage applied</small>{{/if}}</div>
+                    <div class="qb-party-card-action">{{#if canApplyDamage}}<button type="button" class="qb-secondary qb-damage-button" data-app-action="apply-party-damage" data-actor-uuid="{{uuid}}" aria-label="Apply {{damage}} damage to {{name}}">Apply damage</button>{{/if}}</div>
                   </article>
                 {{/if}}
               {{else}}

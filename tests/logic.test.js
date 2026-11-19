@@ -278,7 +278,7 @@ test("participant bonus preview updates from resource-count input changes", () =
 
 test("the supplied feat catalog is parsed in full, including semicolon-containing descriptions", () => {
   const catalog = parseFeatCatalog(catalogText);
-  assert.equal(catalog.length, 383);
+  assert.equal(catalog.length, 384);
   assert.equal(catalog.find((entry) => entry.name === "Actor").bonus, 1);
   assert.equal(catalog.find((entry) => entry.name === "Alert").description, "+5 to initiative; immune to surprise while conscious; no advantage for hidden attackers");
   assert.equal(catalog.find((entry) => entry.name === "War Caster").bonus, 3);
@@ -307,7 +307,7 @@ test("the supplied feat catalog is parsed in full, including semicolon-containin
     ["Breath Weapon", "Active", "Medium"],
     ["Fell Handed", "Passive", "Low"],
     ["Brutal Critical (1 die)", "Passive", "Low"],
-    ["Totem Spirit: Crocodile", "Passive", "High"],
+    ["Totem Spirit: Crocodile", "Passive", "Medium"],
     ["Great Weapon Fighting", "Passive", "Low"],
     ["Polearm Master", "Passive", "Medium"]
   ];
@@ -324,6 +324,19 @@ test("the supplied feat catalog is parsed in full, including semicolon-containin
   assert.doesNotMatch(catalog.find((entry) => entry.name === "Eldritch Invocation: Sign of Ill Omen").description, /Bane/);
   assert.match(catalog.find((entry) => entry.name === "Fell Handed").description, /handaxe battleaxe greataxe warhammer and maul/);
   assert.match(catalog.find((entry) => entry.name === "Totem Spirit: Crocodile").description, /while raging.*resistance to all damage except psychic/i);
+  for (const [name, type, rating] of [
+    ["Reckless Attack", "Passive", "Low"],
+    ["Totem Spirit: Crocodile", "Passive", "Medium"],
+    ["Action Surge", "Active", "Medium"],
+    ["Aura of Protection", "Passive", "Low"],
+    ["Improved Divine Smite", "Passive", "Low"],
+    ["Weapon of Dark Destiny", "Active", "Low"]
+  ]) {
+    const feature = catalog.find((entry) => entry.name === name);
+    assert.equal(feature.type, type);
+    assert.equal(feature.rating, rating);
+  }
+  assert.equal(catalog.find((entry) => entry.name === "Weapon of Dark Destiny").description, "You have a pact with the Weapons of Dark Destiny.");
   assert.equal(catalog.find((entry) => entry.name === "Nature's Veil").category, "Ranger");
   assert.match(catalog.find((entry) => entry.name === "Breath Weapon").description, /saving throw depend on ancestry and racial variant/);
   assert.match(catalog.find((entry) => entry.name === "Relentless Avenger").description, /without provoking opportunity attacks$/);

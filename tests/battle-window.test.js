@@ -4,7 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 import Handlebars from "handlebars";
 import { JSDOM } from "jsdom";
-import { activeUseCount, d20ModifierParts, isRunActive, resourceBonus } from "../scripts/logic.js";
+import { activeUseCount, d20ModifierParts, isRunActive, itemUses, resourceBonus } from "../scripts/logic.js";
 
 const source = await readFile(new URL("../scripts/quick-battles.js", import.meta.url), "utf8");
 const html = await readFile(new URL("../templates/quick-battles.hbs", import.meta.url), "utf8");
@@ -35,14 +35,71 @@ test("participant totals remain outside the scroll area and the resource limit d
   context.update(root);
   assert.equal(button.disabled, true);
   assert.equal(root.querySelector("[data-bonus-total]").textContent, "+5");
+  assert.equal(root.querySelector("[data-combined-bonus]").textContent, "+7");
+  assert.equal(root.querySelector("[data-active-use-feedback]").textContent, "3/2 active resources");
   slot.value = "0";
   context.update(root);
   assert.equal(button.disabled, false);
   assert.equal(root.querySelector("[data-bonus-total]").textContent, "+4");
+  assert.equal(root.querySelector("[data-combined-bonus]").textContent, "+6");
+});
+
+test("active feature steppers change values by one within resource bounds and update totals", async () => {
+  const dom = new JSDOM(template({
+    isParticipant: true, actor: { name: "Hero" },
+    passive: { abilityName: "STR", total: 1 }, passiveEntries: [],
+    activeItems: [{ name: "Rage", itemId: "rage", bonusPerUse: 2, available: 2 }],
+    spellSlots: [], maxActiveUses: 1, dc: 15
+  }));
+  class ApplicationV2 { constructor(options) { this.options = options; } async _onRender() {} }
+  const context = {
+    foundry: { applications: { api: { ApplicationV2, HandlebarsApplicationMixin: (base) => base } } },
+    MODULE_ID: "test", TEMPLATE: "template", activeUseCount, resourceBonus
+  };
+  vm.createContext(context);
+  vm.runInContext(`${part("function updateActiveBonusPreview(", "\nfunction createButton(")}\n${part("class QuickBattlesApplication", "\nfunction renderParticipantResult(")}\nthis.App = QuickBattlesApplication;`, context);
+  const app = new context.App({ mode: "participant" });
+  app.element = dom.window.document.querySelector(".qb-shell");
+  await app._onRender({}, {});
+  const increase = app.element.querySelector('[data-resource-step="1"]');
+  const decrease = app.element.querySelector('[data-resource-step="-1"]');
+  const input = app.element.querySelector('[name="active-rage"]');
+  decrease.click();
+  assert.equal(input.value, "0");
+  increase.click();
+  assert.equal(input.value, "1");
+  assert.equal(app.element.querySelector("[data-combined-bonus]").textContent, "+3");
+  increase.click();
+  increase.click();
+  assert.equal(input.value, "2");
+  assert.equal(app.element.querySelector('[data-app-action="submit-check"]').disabled, true);
+  decrease.click();
+  assert.equal(input.value, "1");
+  assert.equal(app.element.querySelector('[data-app-action="submit-check"]').disabled, false);
+});
+
+test("active spend plans retain D&D 5e spent updates and record each selected bonus", () => {
+  class ApplicationV2 { constructor(options) { this.options = options; } }
+  const context = {
+    foundry: { applications: { api: { ApplicationV2, HandlebarsApplicationMixin: (base) => base } } },
+    MODULE_ID: "test", TEMPLATE: "template", itemUses,
+    CSS: { escape: (value) => value }, numberValue: (value) => Number(value)
+  };
+  vm.createContext(context);
+  vm.runInContext(`${part("class QuickBattlesApplication", "\nfunction renderParticipantResult(")}\nthis.App = QuickBattlesApplication;`, context);
+  const app = new context.App({ mode: "participant" });
+  app.element = { querySelector: () => ({ value: "2" }) };
+  const actor = { items: new Map([["rage", { id: "rage", system: { uses: { max: 4, spent: 1, value: 3 } } }]]) };
+  const plan = app._activeSpendPlan(actor, [{ itemId: "rage", name: "Rage", available: 3, bonusPerUse: 2 }]);
+  assert.equal(plan.count, 2);
+  assert.equal(plan.bonus, 4);
+  assert.equal(plan.updates[0]["system.uses.spent"], 3);
+  assert.equal(plan.entries[0].name, "Rage × 2");
+  assert.equal(plan.entries[0].bonus, 4);
 });
 
 test("GM party shows selection before checks and status cards with damage after checks", () => {
-  const actor = { uuid: "Actor.1", name: "Hero", img: "hero.png", level: 5, defaultSelected: true };
+  const actor = { uuid: "Actor.1", name: "Hero", img: "hero.png", level: 5, hp: 12, maxHp: 20, ac: 16, defaultSelected: true };
   const base = {
     showCurrentRun: true, showEncounter: true, canStartChecks: true,
     state: { fate: { dc: 10 }, fateResult: { failed: true }, selectedEncounter: { name: "Wolves", dc: 15 } },
@@ -58,7 +115,13 @@ test("GM party shows selection before checks and status cards with damage after 
   })).window.document;
   assert.equal(resolved.querySelector(".qb-combat-complete").textContent, "Combat complete");
   assert.equal(resolved.querySelector(".qb-party-card img").getAttribute("src"), "hero.png");
-  assert.match(resolved.querySelector(".qb-party-card").textContent, /Level 5/);
+  assert.match(resolved.querySelector(".qb-party-card").textContent, /Hero \(Level 5\)/);
+  assert.match(resolved.querySelector(".qb-party-card").textContent, /HP 12\/20 · AC 16/);
+  assert.ok(resolved.querySelector(".qb-party-card-action .qb-damage-button"));
+  assert.ok(resolved.querySelector(".qb-primary-column select").disabled);
+  for (const control of resolved.querySelectorAll(".qb-primary-column button, .qb-primary-column input, .qb-primary-column select")) {
+    if (control.dataset.appAction !== "new-battle") assert.equal(control.disabled, true);
+  }
   assert.ok(resolved.querySelector(".qb-party-status-failed"));
   assert.ok(resolved.querySelector('[data-app-action="apply-party-damage"]'));
   assert.equal(resolved.querySelector('[data-app-action="start-checks"]'), null);
@@ -170,6 +233,36 @@ test("native Fate roll retains each nonzero modifier in the formula", async () =
   vm.runInContext(`${part("async function nativeD20(", "\nfunction normalizeConfig(")}\nthis.roll = nativeD20;`, context);
   await context.roll(null, [-2, 0, 3], "Fate");
   assert.deepEqual(Array.from(parts), ["-2", "3"]);
+});
+
+test("participant chat separates aligned bonuses and shows the actual active d20 before the outcome", () => {
+  const context = {
+    escapeHtml: (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[char]),
+    chatCard: (content) => `<article>${content}</article>`
+  };
+  vm.createContext(context);
+  vm.runInContext(`${part("function participantDice(", "\nasync function cardAction(")}\nthis.dice = participantDice; this.render = renderParticipantResult;`, context);
+  const dice = context.dice({ dice: [{ faces: 20, results: [{ result: 3, active: false }, { result: 17, active: true }] }] });
+  assert.deepEqual(Array.from(dice), [17]);
+  const details = {
+    actorName: "Hero", actorImg: "hero.png", dc: 15, total: 25, passed: true,
+    passive: { abilityName: "STR", ability: 3, hp: 0, armor: -1, total: 3 },
+    passiveEntries: [{ name: "Aura", bonus: 1 }],
+    activeEntries: [{ name: "Rage × 2", bonus: 4 }, { name: "Level 1 spell slot × 1", bonus: 1 }],
+    activeBonus: 4, slotBonus: 1, situational: 0, dice
+  };
+  const document = new JSDOM(context.render(details, false)).window.document;
+  const columns = document.querySelectorAll(".qb-check-breakdowns section");
+  assert.equal(columns.length, 2);
+  assert.match(columns[0].textContent, /Aura/);
+  assert.match(columns[1].textContent, /Rage × 2/);
+  assert.equal(columns[1].querySelectorAll("dt").length, columns[1].querySelectorAll("dd").length);
+  assert.equal(document.querySelector(".qb-check-dice").textContent, "d20: 17");
+  assert.ok(document.querySelector(".qb-check-dice").compareDocumentPosition(document.querySelector(".qb-check-roll")) & 4);
+  const legacy = new JSDOM(context.render({ ...details, activeEntries: undefined, dice: undefined }, false)).window.document;
+  assert.match(legacy.querySelectorAll(".qb-check-breakdowns section")[1].textContent, /Active features/);
 });
 
 test("party damage is applied once, capped at one HP and disallowed after reset", async () => {

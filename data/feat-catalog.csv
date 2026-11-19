@@ -1,6 +1,6 @@
 Abjure Enemy (Vengeance), Passive, Medium, Reaction/Trigger to force target to save or have speed reduced to 0 and Frightened status, Paladin
 Accursed Specter (Hexblade), Active, Medium, Summon humanoid soul killed by you as a loyal specter companion until long rest, Warlock
-Action Surge, Active, High, Take one additional Action on your turn once (or twice at level 17) per short/long rest, Fighter
+Action Surge, Active, Medium, Take one additional Action on your turn once (or twice at level 17) per short/long rest, Fighter
 Actor, Passive, Low, Passive bonus to Deception/Performance checks and voice mimicry, Feat
 Agonizing Blast (Eldritch Invocation), Passive, High, Add Charisma modifier to damage of each hit with Eldritch Blast, Eldritch Invocation
 Alchemical Savant (Alchemist), Passive, Low, Add INT modifier to damage or healing rolls of spells using alchemist's supplies, Artificer
@@ -8,7 +8,7 @@ Alert, Passive, High, +5 to initiative; immune to surprise while conscious; no a
 Aura of Conquest (Conquest), Passive, High, Frightened enemies within 10ft have speed 0 and take psychic damage equal to half Paladin level, Paladin
 Aura of Courage, Passive, Low, Allies within 10ft (30ft at level 18) cannot be Frightened while Paladin is conscious, Paladin
 Aura of Devotion (Devotion), Passive, Medium, Allies within 10ft cannot be Charmed, Paladin
-Aura of Protection, Passive, Medium, Allies within 10ft (30ft at level 18) add Paladin's CHA modifier to all saving throws while conscious, Paladin
+Aura of Protection, Passive, Low, Allies within 10ft (30ft at level 18) add Paladin's CHA modifier to all saving throws while conscious, Paladin
 Aura of Warding (Ancients), Passive, High, Paladin and allies within 10ft have resistance to damage from spells, Paladin
 Arcane Abeyance (Chronurgy), Active, High, Freeze 4th or lower level spell into bead for 1 hour; any creature holding bead can cast spell using Action, Wizard
 Arcane Armor (Armorer), Passive, High, Turn heavy armor into power armor (Guardian for Temp HP + taunt punch or Infiltrator for 1d6 lightning + speed), Artificer
@@ -180,7 +180,7 @@ Hurl Through Hell (Fiend), Active, High, Once per long rest on hit vanish target
 Hypnotic Gaze (Enchantment), Passive, Low, Action to daze target within 5ft (WIS save or Incapacitated and speed 0 on subsequent turns), Wizard
 Improved Abjuration (Abjuration), Passive, High, Add proficiency bonus to Counterspell and Dispel Magic ability checks, Wizard
 Improved Critical (Champion), Passive, Medium, Weapon attacks score a critical hit on a roll of 19 or 20, Fighter
-Improved Divine Smite, Passive, Medium, All melee weapon hits automatically deal an extra 1d8 radiant damage, Paladin
+Improved Divine Smite, Passive, Low, All melee weapon hits automatically deal an extra 1d8 radiant damage, Paladin
 Indomitable, Active, Medium, Reroll a failed saving throw once (up to 3 times) per long rest, Fighter
 Indomitable Might, Passive, Low, Use STR score in place of total if STR check roll is lower than STR score, Barbarian
 Infernal Constitution, Passive, Medium, Cold and Poison damage resistance; advantage on saving throws against poison, Feat
@@ -265,7 +265,7 @@ Rage, Active, Medium, Bonus Action to enter Rage: advantage on STR checks/saves 
 Rage Beyond Death (Zealot), Passive, High, Taking damage at 0 HP does not knock you unconscious while raging until rage ends, Barbarian
 Rakish Audacity (Swashbuckler), Passive, High, Add CHA modifier to initiative; trigger Sneak Attack without advantage if within 5ft of target, Rogue
 Rapid Strike (Samurai), Passive, High, Forgo advantage on one attack to make one additional weapon attack as part of Attack action, Fighter
-Reckless Attack, Passive, Medium, First attack on turn gains advantage; enemy attacks against you gain advantage until next turn, Barbarian
+Reckless Attack, Passive, Low, First attack on turn gains advantage; enemy attacks against you gain advantage until next turn, Barbarian
 Relentless (Battle Master), Passive, Low, Regain 1 Superiority Die when initiating combat with 0 remaining, Fighter
 Relentless Avenger, Passive, Low, When you hit a creature with an opportunity attack move up to half your speed as part of the reaction without provoking opportunity attacks, Paladin
 Relentless Rage, Active, High, DC 10 CON save (increases by 5 per check) to drop to 1 HP instead of 0 HP while raging, Barbarian
@@ -345,7 +345,7 @@ Tides of Chaos (Wild Magic), Active, Medium, Gain advantage on one attack check 
 Timeless Body, Passive, Low, Age 1 year for every 10 years passed; immune to magical aging, Druid
 Tokens of the Departed (Phantom), Passive, Medium, Reaction when creature dies within 30ft to capture Soul Token: grants save advantage and target query, Rogue
 Tool Expertise, Passive, Low, Double proficiency bonus for any check made using artisan's tools, Artificer
-Totem Spirit: Crocodile, Passive, High, While raging, you have resistance to all damage except psychic damage, Barbarian
+Totem Spirit: Crocodile, Passive, Medium, While raging, you have resistance to all damage except psychic damage, Barbarian
 Touch of Death (Long Death), Passive, Medium, Regain Temp HP equal to WIS mod + Monk level when reducing target within 5ft to 0 HP, Monk
 Tough, Passive, Medium, Increase max HP by 2x character level (+2 HP per level retroactively), Feat
 Transmuted Spell (Metamagic), Passive, Medium, Spend 1 point to change elemental damage type (acid cold fire lightning poison thunder), Sorcerer
@@ -374,6 +374,7 @@ Warding Flare (Light), Active, Medium, Reaction when attacked to impose disadvan
 Warding Maneuver (Cavalier), Active, Medium, Reaction to add 1d8 to AC of self or ally within 5ft or grant resistance against hit, Fighter
 Weapon Bond (Eldritch Knight), Active, Low, Bonus Action to summon bonded weapon to hand from any distance on same plane, Fighter
 Weapon Master, Passive, Low, Proficiency with 4 chosen martial/simple weapons, Feat
+Weapon of Dark Destiny, Active, Low, You have a pact with the Weapons of Dark Destiny., Custom
 Wholeness of Body (Open Hand), Active, Low, Action to regain HP equal to 3 x Monk level once per long rest, Monk
 Wild Companion, Active, Low, Spend 1 Wild Shape use to cast Find Familiar without material components, Druid
 Wild Magic Surge (Wild Magic), Passive, Low, Roll d100 after casting 1st+ level spell to trigger random magical surge table effect, Sorcerer
