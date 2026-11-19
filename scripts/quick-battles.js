@@ -693,6 +693,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     this.users = [];
     this.activeEncounterId = null;
     this.activeCatalogIndex = null;
+    this.newCatalogIndex = null;
     this.reopenCatalogManagerAfterEdit = false;
     this.selectedEncounterGroupId = null;
   }
@@ -784,6 +785,20 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     });
     this.element.addEventListener("close", (event) => {
       if (event.target.matches("[data-catalog-edit-dialog]")) {
+        if (this.newCatalogIndex !== null) {
+          const collection = this.element.querySelector('[data-config-collection="catalogOverrides"]');
+          const row = collection.querySelector(`[data-config-index="${this.newCatalogIndex}"]`);
+          row?.remove();
+          this.configDraft.catalogOverrides.splice(this.newCatalogIndex, 1);
+          if (!collection.querySelector("[data-config-row]")) {
+            const empty = document.createElement("p");
+            empty.className = "qb-muted";
+            empty.dataset.catalogEmpty = "";
+            empty.textContent = "No feature changes have been added.";
+            collection.append(empty);
+          }
+          this.newCatalogIndex = null;
+        }
         this.activeCatalogIndex = null;
         this._reopenCatalogManagerAfterEdit();
       }
@@ -994,8 +1009,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
   }
 
   _openEncounterDialog(button) {
-    const form = this.element.querySelector(".qb-configuration-form");
-    this.configDraft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
+    this.configDraft = readConfigurationForm(this.element, this.configDraft ?? DEFAULT_CONFIG);
     const encounterId = button.closest("[data-encounter-id]").dataset.encounterId;
     const encounter = this.configDraft.encounters.find((entry) => entry.id === encounterId);
     if (!encounter) throw new Error("The selected encounter could not be found.");
@@ -1012,7 +1026,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
 
   _openCatalogDialog(row) {
     this.configDraft = readConfigurationForm(
-      this.element.querySelector(".qb-configuration-form"),
+      this.element,
       this.configDraft ?? DEFAULT_CONFIG
     );
     const index = Number(row.dataset.configIndex);
@@ -1041,9 +1055,11 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
 
   _saveCatalogDialog() {
     const dialog = this.element.querySelector("[data-catalog-edit-dialog]");
-    if (!dialog.reportValidity()) return;
+    for (const input of dialog.querySelectorAll("input:invalid, select:invalid, textarea:invalid")) {
+      if (!input.reportValidity()) return;
+    }
     this.configDraft = readConfigurationForm(
-      this.element.querySelector(".qb-configuration-form"),
+      this.element,
       this.configDraft ?? DEFAULT_CONFIG
     );
     const override = this.configDraft.catalogOverrides[this.activeCatalogIndex];
@@ -1075,6 +1091,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       `Configure ${override.name}`
     );
     row.querySelector('[data-app-action="remove-row"]').setAttribute("aria-label", `Remove ${override.name}`);
+    this.newCatalogIndex = null;
     dialog.close();
     this.activeCatalogIndex = null;
   }
@@ -1085,7 +1102,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       if (!input.reportValidity()) return;
     }
     this.configDraft = readConfigurationForm(
-      this.element.querySelector(".qb-configuration-form"),
+      this.element,
       this.configDraft ?? DEFAULT_CONFIG
     );
     const encounter = this.configDraft.encounters.find((entry) => entry.id === this.activeEncounterId);
@@ -1123,8 +1140,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
 
   async _removeEncounterGroup(button) {
     const selectedTab = this._selectedConfigurationTab();
-    const form = this.element.querySelector(".qb-configuration-form");
-    const draft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
+    const draft = readConfigurationForm(this.element, this.configDraft ?? DEFAULT_CONFIG);
     const row = button.closest("[data-config-row]");
     const groupId = row.querySelector('[data-field="id"]').value;
     if (draft.encounterGroups.length <= 1) {
@@ -1162,7 +1178,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
         invalidField.reportValidity();
         return;
       }
-      this.configDraft = await writeConfig(readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG));
+      this.configDraft = await writeConfig(readConfigurationForm(this.element, this.configDraft ?? DEFAULT_CONFIG));
       ui.notifications.info("Quick Battles configuration saved.");
       mainApplication?.render();
       return this.close();
@@ -1173,7 +1189,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
     }
     if (action === "open-catalog-manager") {
       this.configDraft = readConfigurationForm(
-        this.element.querySelector(".qb-configuration-form"),
+        this.element,
         this.configDraft ?? DEFAULT_CONFIG
       );
       this.element.querySelector("[data-catalog-manager-dialog]").showModal();
@@ -1203,10 +1219,9 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       }
       const reopenCatalogManager = Boolean(row?.closest("[data-catalog-manager-dialog]")?.open);
       const selectedTab = this._selectedConfigurationTab();
-      const form = this.element.querySelector(".qb-configuration-form");
-      this.configDraft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
+      this.configDraft = readConfigurationForm(this.element, this.configDraft ?? DEFAULT_CONFIG);
       row?.remove();
-      this.configDraft = readConfigurationForm(form, this.configDraft);
+      this.configDraft = readConfigurationForm(this.element, this.configDraft);
       await this._rerenderConfiguration({ tab: selectedTab, openCatalogManager: reopenCatalogManager });
       return;
     }
@@ -1228,8 +1243,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       this.element.querySelector("[data-dialog-roster]").append(this._createRosterRow());
       return;
     }
-    const form = this.element.querySelector(".qb-configuration-form");
-    this.configDraft = readConfigurationForm(form, this.configDraft ?? DEFAULT_CONFIG);
+    this.configDraft = readConfigurationForm(this.element, this.configDraft ?? DEFAULT_CONFIG);
     if (action === "add-player") {
       if (!button.value) return;
       this.configDraft.players.push({ userId: button.value, actorUuid: "" });
@@ -1251,6 +1265,7 @@ class QuickBattlesConfigurationApplication extends foundry.applications.api.Hand
       await this._rerenderConfiguration({ openCatalogManager: true });
       const row = Array.from(this.element.querySelectorAll('[data-config-collection="catalogOverrides"] [data-config-row]'))
         .find((entry) => Number(entry.dataset.configIndex) === index);
+      this.newCatalogIndex = index;
       this._openCatalogDialog(row);
       return;
     }
