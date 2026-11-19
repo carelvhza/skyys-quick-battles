@@ -135,6 +135,18 @@ test("catalog editing opens separately and returns to the manager when closed", 
   assert.match(applicationSource, /_reopenCatalogManagerAfterEdit\(\) \{\s*if \(!this\.reopenCatalogManagerAfterEdit\) return;\s*this\.reopenCatalogManagerAfterEdit = false;[\s\S]*?manager\.showModal\(\)/);
 });
 
+test("encounter configuration fields use consistent layouts and a native actor dropdown", () => {
+  const rosterRowSource = applicationSource.slice(
+    applicationSource.indexOf("_createRosterRow(member = {})"),
+    applicationSource.indexOf("_openEncounterDialog(button)")
+  );
+  assert.match(rosterRowSource, /actorSelect\.size = 1/);
+  assert.doesNotMatch(rosterRowSource, /actorSelect\.size = this\.actorOptions\.length/);
+  assert.match(configurationTemplate, /data-dialog-field="description" rows="5"/);
+  assert.match(styleSource, /\.qb-config-dialog\[data-encounter-dialog\] \.qb-field,[\s\S]*?\.qb-roster-config-row \.qb-field\s*\{\s*display: grid;[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(styleSource, /\.qb-roster-config-row \.qb-field input\s*\{\s*width: 100%;/);
+});
+
 test("Quick Battles remembers selections without duplicate main-window configuration", () => {
   assert.match(applicationSource, /scope: "client"[\s\S]*?type: Object/);
   assert.match(applicationSource, /rememberSelection\(\{ area \}\)/);
